@@ -59,7 +59,9 @@ class RollingScorer:
         if len(h) < WARMUP_BARS:
             return None
         df = pd.DataFrame(list(h))
-        df["window_start"] = pd.to_datetime(df["window_start"])
+        # utc=True: bootstrap rows from ClickHouse are tz-naive while
+        # streaming bars carry ISO offsets — mixing them raises in pandas
+        df["window_start"] = pd.to_datetime(df["window_start"], utc=True)
         feats = build_features(df)
         if feats.empty:
             return None

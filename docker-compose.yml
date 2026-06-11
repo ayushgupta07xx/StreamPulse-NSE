@@ -88,12 +88,20 @@ services:
     image: streampulse/flink:1.18-py
     pull_policy: never
     command: taskmanager
+    restart: unless-stopped
     deploy:
       replicas: 2
+      resources:
+        limits:
+          # hard ceiling: PyFlink worker processes live OUTSIDE the JVM cap;
+          # without this a backlog burst freezes the whole Docker VM instead
+          # of killing one container (which auto-restarts and resumes from
+          # the last checkpoint — exactly-once makes that safe)
+          memory: 2g
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
-        taskmanager.numberOfTaskSlots: 4
+        taskmanager.numberOfTaskSlots: 2
         taskmanager.memory.process.size: 1280m
         taskmanager.memory.jvm-overhead.max: 192m
         taskmanager.memory.managed.fraction: 0.25

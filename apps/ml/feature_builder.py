@@ -64,16 +64,18 @@ def build_features(bars: pd.DataFrame) -> pd.DataFrame:
     def per_ticker(g: pd.DataFrame) -> pd.DataFrame:
         g = g.sort_values("window_start").copy()
         g["log_return"] = np.log(g["close"] / g["close"].shift(1))
-        g["return_volatility"] = g["log_return"].rolling(_VOL_WINDOW).std()
+        g["return_volatility"] = g["log_return"].rolling(_VOL_WINDOW, min_periods=4).std()
 
-        vol_mean = g["volume"].rolling(_Z_WINDOW).mean()
-        vol_std = g["volume"].rolling(_Z_WINDOW).std()
+        # min_periods: short replay sessions (< _Z_WINDOW bars/ticker) still
+        # produce defined features — slightly noisier z-scores early on
+        vol_mean = g["volume"].rolling(_Z_WINDOW, min_periods=12).mean()
+        vol_std = g["volume"].rolling(_Z_WINDOW, min_periods=12).std()
         g["volume_zscore"] = (g["volume"] - vol_mean) / (vol_std + _EPS)
 
         g["vwap_deviation"] = (g["close"] - g["vwap"]) / (g["vwap"] + _EPS)
 
-        tc_mean = g["tick_count"].rolling(_Z_WINDOW).mean()
-        tc_std = g["tick_count"].rolling(_Z_WINDOW).std()
+        tc_mean = g["tick_count"].rolling(_Z_WINDOW, min_periods=12).mean()
+        tc_std = g["tick_count"].rolling(_Z_WINDOW, min_periods=12).std()
         g["tick_count_zscore"] = (g["tick_count"] - tc_mean) / (tc_std + _EPS)
 
         rng = (g["high"] - g["low"]).clip(lower=_EPS)

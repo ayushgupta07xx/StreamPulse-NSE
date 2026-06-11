@@ -1,0 +1,188 @@
+{
+  "session_id": "sess-719d056cf9cf",
+  "seed": 555,
+  "trading_date": "2026-06-11",
+  "generated_at": "2026-06-11T18:31:58.538258+05:30",
+  "anomalies": [
+    {
+      "anomaly_id": "SUNPHARMA-000",
+      "ticker": "SUNPHARMA",
+      "anomaly_type": "VOLUME_SURGE",
+      "start_ts": "2026-06-11T13:28:10+05:30",
+      "end_ts": "2026-06-11T13:29:02+05:30",
+      "magnitude": 27.736406990592023,
+      "description": "volume \u00d728 for 52s"
+    },
+    {
+      "anomaly_id": "TITAN-001",
+      "ticker": "TITAN",
+      "anomaly_type": "VOLATILITY_BURST",
+      "start_ts": "2026-06-11T14:28:44+05:30",
+      "end_ts": "2026-06-11T14:30:16+05:30",
+      "magnitude": 7.651518170434743,
+      "description": "volatility \u00d77.7 for 92s"
+    },
+    {
+      "anomaly_id": "ONGC-002",
+      "ticker": "ONGC",
+      "anomaly_type": "PRICE_SPIKE",
+      "start_ts": "2026-06-11T10:04:03+05:30",
+      "end_ts": "2026-06-11T10:04:08+05:30",
+      "magnitude": -0.03230610788115641,
+      "description": "-3.23% spike for 5s"
+    },
+    {
+      "anomaly_id": "ADANIENT-003",
+      "ticker": "ADANIENT",
+      "anomaly_type": "VOLUME_SURGE",
+      "start_ts": "2026-06-11T12:04:26+05:30",
+      "end_ts": "2026-06-11T12:04:42+05:30",
+      "magnitude": 19.409803100081433,
+      "description": "volume \u00d719 for 16s"
+    },
+    {
+      "anomaly_id": "NTPC-004",
+      "ticker": "NTPC",
+      "anomaly_type": "LEVEL_SHIFT",
+      "start_ts": "2026-06-11T12:28:21+05:30",
+      "end_ts": "2026-06-11T12:30:21+05:30",
+      "magnitude": 0.020833074407642982,
+      "description": "+2.08% persistent level shift"
+    },
+    {
+      "anomaly_id": "SBIN-005",
+      "ticker": "SBIN",
+      "anomaly_type": "VOLATILITY_BURST",
+      "start_ts": "2026-06-11T12:28:16+05:30",
+      "end_ts": "2026-06-11T12:29:56+05:30",
+      "magnitude": 4.383553151253201,
+      "description": "volatility \u00d74.4 for 100s"
+    },
+    {
+      "anomaly_id": "BAJAJ-AUTO-006",
+      "ticker": "BAJAJ-AUTO",
+      "anomaly_type": "PRICE_SPIKE",
+      "start_ts": "2026-06-11T11:17:42+05:30",
+      "end_ts": "2026-06-11T11:17:44+05:30",
+      "magnitude": -0.0440106302288055,
+      "description": "-4.40% spike for 2s"
+    },
+    {
+      "anomaly_id": "BAJFINANCE-007",
+      "ticker": "BAJFINANCE",
+      "anomaly_type": "VOLATILITY_BURST",
+      "start_ts": "2026-06-11T11:19:36+05:30",
+      "end_ts": "2026-06-11T11:20:11+05:30",
+      "magnitude": 7.557836121839866,
+      "description": "volatility \u00d77.6 for 35s"
+    },
+    {
+      "anomaly_id": "HDFCBANK-008",
+      "ticker": "HDFCBANK",
+      "anomaly_type": "VOLATILITY_BURST",
+      "start_ts": "2026-06-11T11:16:46+05:30",
+      "end_ts": "2026-06-11T11:18:14+05:30",
+      "magnitude": 7.399301793387269,
+      "description": "volatility \u00d77.4 for 88s"
+    },
+    {
+      "anomaly_id": "ADANIPORTS-009",
+      "ticker": "ADANIPORTS",
+      "anomaly_type": "LEVEL_SHIFT",
+      "start_ts": "2026-06-11T14:00:43+05:30",
+      "end_ts": "2026-06-11T14:02:43+05:30",
+      "magnitude": 0.013328793544094435,
+      "description": "+1.33% persistent level shift"
+    },
+    {
+      "anomaly_id": "MARUTI-010",
+      "ticker": "MARUTI",
+      "anomaly_type": "PRICE_SPIKE",
+      "start_ts": "2026-06-11T11:38:21+05:30",
+      "end_ts": "2026-06-11T11:38:26+05:30",
+      "magnitude": 0.031171139683901464,
+      "description": "+3.12% spike for 5s"
+    },
+    {
+      "anomaly_id": "TECHM-011",
+      "ticker": "TECHM",
+      "anomaly_type": "PRICE_SPIKE",
+      "start_ts": "2026-06-11T10:36:38+05:30",
+      "end_ts": "2026-06-11T10:36:41+05:30",
+      "magnitude": -0.02942565375891737,
+      "description": "-2.94% spike for 3s"
+    },
+    {
+      "anomaly_id": "BRITANNIA-012",
+      "ticker": "BRITANNIA",
+      "anomaly_type": "PRICE_SPIKE",
+      "start_ts": "2026-06-11T12:58:13+05:30",
+      "end_ts": "2026-06-11T12:58:18+05:30",
+      "magnitude": -0.030908693143173162,
+      "description": "-3.09% spike for 5s"
+    },
+    {
+      "anomaly_id": "ITC-013",
+      "ticker": "ITC",
+      "anomaly_type": "PRICE_SPIKE",
+      "start_ts": "2026-06-11T10:08:02+05:30",
+      "end_ts": "2026-06-11T10:08:08+05:30",
+      "magnitude": 0.02229356531051261,
+      "description": "+2.23% spike for 6s"
+    },
+    {
+      "anomaly_id": "NESTLEIND-014",
+      "ticker": "NESTLEIND",
+      "anomaly_type": "LEVEL_SHIFT",
+      "start_ts": "2026-06-11T12:56:02+05:30",
+      "end_ts": "2026-06-11T12:58:02+05:30",
+      "magnitude": -0.013298507612570587,
+      "description": "-1.33% persistent level shift"
+    },
+    {
+      "anomaly_id": "BRITANNIA-015",
+      "ticker": "BRITANNIA",
+      "anomaly_type": "LEVEL_SHIFT",
+      "start_ts": "2026-06-11T13:28:46+05:30",
+      "end_ts": "2026-06-11T13:30:46+05:30",
+      "magnitude": 0.02297881932745495,
+      "description": "+2.30% persistent level shift"
+    },
+    {
+      "anomaly_id": "JSWSTEEL-016",
+      "ticker": "JSWSTEEL",
+      "anomaly_type": "PRICE_SPIKE",
+      "start_ts": "2026-06-11T10:23:25+05:30",
+      "end_ts": "2026-06-11T10:23:31+05:30",
+      "magnitude": 0.022253622463379936,
+      "description": "+2.23% spike for 6s"
+    },
+    {
+      "anomaly_id": "BAJFINANCE-017",
+      "ticker": "BAJFINANCE",
+      "anomaly_type": "PRICE_SPIKE",
+      "start_ts": "2026-06-11T14:45:55+05:30",
+      "end_ts": "2026-06-11T14:46:01+05:30",
+      "magnitude": -0.020721887503075364,
+      "description": "-2.07% spike for 6s"
+    },
+    {
+      "anomaly_id": "TITAN-018",
+      "ticker": "TITAN",
+      "anomaly_type": "PRICE_SPIKE",
+      "start_ts": "2026-06-11T10:22:53+05:30",
+      "end_ts": "2026-06-11T10:22:57+05:30",
+      "magnitude": 0.03609324315928991,
+      "description": "+3.61% spike for 4s"
+    },
+    {
+      "anomaly_id": "TMPV-019",
+      "ticker": "TMPV",
+      "anomaly_type": "LEVEL_SHIFT",
+      "start_ts": "2026-06-11T10:26:36+05:30",
+      "end_ts": "2026-06-11T10:28:36+05:30",
+      "magnitude": 0.011590732055428696,
+      "description": "+1.16% persistent level shift"
+    }
+  ]
+}

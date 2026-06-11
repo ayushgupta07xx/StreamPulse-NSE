@@ -1,5 +1,7 @@
 # StreamPulse NSE — operational targets
-# Windows note: requires GNU Make; all recipes are plain docker/git commands.
+# Portable across Windows (.venv/Scripts) and Linux/macOS (.venv/bin):
+# override with `make PYTHON=python3 <target>` to skip the venv entirely.
+PYTHON := $(or $(wildcard .venv/Scripts/python.exe),$(wildcard .venv/bin/python),python)
 
 .PHONY: up down ps logs smoke build demo benchmark k8s
 
@@ -33,19 +35,26 @@ flink-jobs:
 
 # Full event-time reset: cancel jobs, wipe topics+groups, resubmit
 reset:
-	.venv/Scripts/python.exe scripts/reset_pipeline.py $(if $(OOO),--ooo-seconds $(OOO),)
+	"$(PYTHON)" scripts/reset_pipeline.py $(if $(OOO),--ooo-seconds $(OOO),)
 
 verify-bars:
-	.venv/Scripts/python.exe scripts/verify_bars.py
+	"$(PYTHON)" scripts/verify_bars.py
 
 # 5-minute live demo: wall-clock ticks + a visible spike on TCS.
 # Open Grafana (localhost:23000) -> Market Overview + Anomaly Feed first.
 demo:
-	.venv/Scripts/python.exe scripts/inject_demo_anomalies.py --ticker TCS --minutes 5
+	"$(PYTHON)" scripts/inject_demo_anomalies.py --ticker TCS --minutes 5
 
 # Detection accuracy benchmark against injected ground truth
 benchmark:
-	.venv/Scripts/python.exe tests/benchmarks/evaluate_detection.py --markdown
+	"$(PYTHON)" tests/benchmarks/evaluate_detection.py --markdown
+
+# Daily Isolation Forest retrain + streaming scorer (Day 9)
+retrain:
+	"$(PYTHON)" -m ml.isolation_forest_retrain retrain --days 7
+
+predict:
+	"$(PYTHON)" -m ml.predict_loop run
 
 # Copy SQL / job sources / dashboards / reference data into chart files/ dirs
 # (charts must be self-contained for helm package + .Files access)
