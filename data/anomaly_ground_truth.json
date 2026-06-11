@@ -1,53 +1,80 @@
 {
-  "session_id": "sess-02fcc37ed123",
-  "seed": 99,
+  "session_id": "sess-0686177ddc40",
+  "seed": 123,
   "trading_date": "2026-06-11",
-  "generated_at": "2026-06-11T13:42:09.740288+05:30",
+  "generated_at": "2026-06-11T14:16:23.230914+05:30",
   "anomalies": [
     {
-      "anomaly_id": "AXISBANK-000",
-      "ticker": "AXISBANK",
+      "anomaly_id": "TITAN-000",
+      "ticker": "TITAN",
       "anomaly_type": "VOLATILITY_BURST",
-      "start_ts": "2026-06-11T12:02:17+05:30",
-      "end_ts": "2026-06-11T12:04:01+05:30",
-      "magnitude": 4.024103524203197,
-      "description": "volatility \u00d74.0 for 104s"
+      "start_ts": "2026-06-11T15:08:00+05:30",
+      "end_ts": "2026-06-11T15:09:53+05:30",
+      "magnitude": 7.9762932107333935,
+      "description": "volatility \u00d78.0 for 113s"
     },
     {
       "anomaly_id": "INFY-001",
       "ticker": "INFY",
-      "anomaly_type": "VOLUME_SURGE",
-      "start_ts": "2026-06-11T09:34:29+05:30",
-      "end_ts": "2026-06-11T09:34:50+05:30",
-      "magnitude": 22.95927797126972,
-      "description": "volume \u00d723 for 21s"
-    },
-    {
-      "anomaly_id": "TCS-002",
-      "ticker": "TCS",
       "anomaly_type": "VOLATILITY_BURST",
-      "start_ts": "2026-06-11T12:11:42+05:30",
-      "end_ts": "2026-06-11T12:13:34+05:30",
-      "magnitude": 7.147014651619516,
-      "description": "volatility \u00d77.1 for 112s"
+      "start_ts": "2026-06-11T12:52:03+05:30",
+      "end_ts": "2026-06-11T12:53:44+05:30",
+      "magnitude": 5.428290631907385,
+      "description": "volatility \u00d75.4 for 101s"
     },
     {
-      "anomaly_id": "DIVISLAB-003",
-      "ticker": "DIVISLAB",
+      "anomaly_id": "WIPRO-002",
+      "ticker": "WIPRO",
+      "anomaly_type": "LEVEL_SHIFT",
+      "start_ts": "2026-06-11T12:23:51+05:30",
+      "end_ts": "2026-06-11T12:25:51+05:30",
+      "magnitude": 0.02407978008526971,
+      "description": "+2.41% persistent level shift"
+    },
+    {
+      "anomaly_id": "DRREDDY-003",
+      "ticker": "DRREDDY",
+      "anomaly_type": "LEVEL_SHIFT",
+      "start_ts": "2026-06-11T13:16:36+05:30",
+      "end_ts": "2026-06-11T13:18:36+05:30",
+      "magnitude": -0.0218414334284528,
+      "description": "-2.18% persistent level shift"
+    },
+    {
+      "anomaly_id": "HDFCLIFE-004",
+      "ticker": "HDFCLIFE",
+      "anomaly_type": "VOLATILITY_BURST",
+      "start_ts": "2026-06-11T15:09:29+05:30",
+      "end_ts": "2026-06-11T15:10:13+05:30",
+      "magnitude": 5.190844131694561,
+      "description": "volatility \u00d75.2 for 44s"
+    },
+    {
+      "anomaly_id": "BHARTIARTL-005",
+      "ticker": "BHARTIARTL",
       "anomaly_type": "PRICE_SPIKE",
-      "start_ts": "2026-06-11T10:35:07+05:30",
-      "end_ts": "2026-06-11T10:35:13+05:30",
-      "magnitude": 0.041633501458155184,
-      "description": "+4.16% spike for 6s"
+      "start_ts": "2026-06-11T10:32:31+05:30",
+      "end_ts": "2026-06-11T10:32:33+05:30",
+      "magnitude": 0.04180872114022717,
+      "description": "+4.18% spike for 2s"
     },
     {
-      "anomaly_id": "HINDALCO-004",
-      "ticker": "HINDALCO",
-      "anomaly_type": "VOLATILITY_BURST",
-      "start_ts": "2026-06-11T12:31:32+05:30",
-      "end_ts": "2026-06-11T12:33:22+05:30",
-      "magnitude": 5.882569750753299,
-      "description": "volatility \u00d75.9 for 110s"
+      "anomaly_id": "POWERGRID-006",
+      "ticker": "POWERGRID",
+      "anomaly_type": "PRICE_SPIKE",
+      "start_ts": "2026-06-11T12:59:01+05:30",
+      "end_ts": "2026-06-11T12:59:06+05:30",
+      "magnitude": -0.024775743187755966,
+      "description": "-2.48% spike for 5s"
+    },
+    {
+      "anomaly_id": "TMPV-007",
+      "ticker": "TMPV",
+      "anomaly_type": "LEVEL_SHIFT",
+      "start_ts": "2026-06-11T10:21:53+05:30",
+      "end_ts": "2026-06-11T10:23:53+05:30",
+      "magnitude": -0.016472754659327286,
+      "description": "-1.65% persistent level shift"
     }
   ]
 }

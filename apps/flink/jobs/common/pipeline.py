@@ -30,9 +30,26 @@ from pyflink.datastream.connectors.kafka import (
 BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "redpanda:9092")
 DATA_DIR = os.environ.get("STREAMPULSE_DATA_DIR", "/opt/streampulse/data")
 
-# §13 watermark strategy
-OUT_OF_ORDERNESS_S = 5
+# §13 watermark strategy.
+# IMPORTANT (replay semantics): the bound is event-time seconds. Replaying at
+# N× multiplies effective disorder — 1 wall-second of partition-consumer skew
+# becomes N event-seconds — so fast replays must widen the bound (pass
+# --ooo-seconds ≈ 5×speed at submit time). 5 s is the live (1×) calibration.
+OUT_OF_ORDERNESS_S = int(os.environ.get("WATERMARK_OOO_SECONDS", "5"))
 IDLENESS_S = 10
+
+
+def ooo_from_argv(default_s: int = OUT_OF_ORDERNESS_S) -> int:
+    """Read --ooo-seconds N from the job's argv (graph-build time, client side)."""
+    import sys
+
+    argv = sys.argv
+    if "--ooo-seconds" in argv:
+        try:
+            return int(argv[argv.index("--ooo-seconds") + 1])
+        except (IndexError, ValueError):
+            pass
+    return default_s
 
 
 def make_env(parallelism: int = 2) -> StreamExecutionEnvironment:
@@ -86,10 +103,11 @@ class TickTimestampAssigner(TimestampAssigner):
         return ts_to_epoch_ms(value["timestamp_ist"])
 
 
-def tick_watermarks() -> WatermarkStrategy:
-    """Bounded out-of-orderness 5 s + idle-source detection 10 s (§13)."""
+def tick_watermarks(ooo_seconds: int | None = None) -> WatermarkStrategy:
+    """Bounded out-of-orderness (default 5 s) + idle-source detection 10 s (§13)."""
+    bound = OUT_OF_ORDERNESS_S if ooo_seconds is None else ooo_seconds
     return (
-        WatermarkStrategy.for_bounded_out_of_orderness(Duration.of_seconds(OUT_OF_ORDERNESS_S))
+        WatermarkStrategy.for_bounded_out_of_orderness(Duration.of_seconds(bound))
         .with_idleness(Duration.of_seconds(IDLENESS_S))
         .with_timestamp_assigner(TickTimestampAssigner())
     )

@@ -25,19 +25,18 @@ import sys
 from pyflink.common import Types
 from pyflink.common.time import Time
 from pyflink.datastream import OutputTag, StreamExecutionEnvironment
-from pyflink.datastream.functions import AggregateFunction, ProcessWindowFunction
 from pyflink.datastream.window import TumblingEventTimeWindows
 
 sys.path.insert(0, "/opt/streampulse/flink/jobs")
 
+from common.ohlcv import AttachWindowMeta, OhlcvAggregate  # noqa: E402
 from common.pipeline import (  # noqa: E402
     dumps,
-    epoch_ms_to_iso,
     kafka_exactly_once_sink,
     kafka_json_source,
     make_env,
+    ooo_from_argv,
     tick_watermarks,
-    ts_to_epoch_ms,
 )
 
 ALLOWED_LATENESS_S = 30
@@ -49,68 +48,6 @@ WINDOWS = {
 }
 
 
-class OhlcvAggregate(AggregateFunction):
-    """Incremental OHLCV accumulator (constant memory per open window)."""
-
-    def create_accumulator(self):
-        #      first_ts   open   high  low   last_ts  close  vol  pv_sum  n
-        return [None, 0.0, float("-inf"), float("inf"), None, 0.0, 0, 0.0, 0]
-
-    def add(self, tick: dict, acc):
-        ts = ts_to_epoch_ms(tick["timestamp_ist"])
-        price, vol = float(tick["price"]), int(tick["volume"])
-        if acc[0] is None or ts < acc[0]:
-            acc[0], acc[1] = ts, price
-        if acc[4] is None or ts >= acc[4]:
-            acc[4], acc[5] = ts, price
-        acc[2] = max(acc[2], price)
-        acc[3] = min(acc[3], price)
-        acc[6] += vol
-        acc[7] += price * vol
-        acc[8] += 1
-        return acc
-
-    def get_result(self, acc):
-        return {
-            "open": acc[1],
-            "high": acc[2],
-            "low": acc[3],
-            "close": acc[5],
-            "volume": acc[6],
-            "vwap": round(acc[7] / acc[6], 4) if acc[6] else acc[5],
-            "tick_count": acc[8],
-        }
-
-    def merge(self, a, b):
-        first = a if (b[0] is None or (a[0] is not None and a[0] <= b[0])) else b
-        last = a if (b[4] is None or (a[4] is not None and a[4] >= b[4])) else b
-        return [
-            first[0], first[1],
-            max(a[2], b[2]), min(a[3], b[3]),
-            last[4], last[5],
-            a[6] + b[6], a[7] + b[7], a[8] + b[8],
-        ]
-
-
-class AttachWindowMeta(ProcessWindowFunction):
-    """Stamp ticker + window bounds + bar size onto the aggregate."""
-
-    def __init__(self, bar_size: str) -> None:
-        self.bar_size = bar_size
-
-    def process(self, key: str, context: ProcessWindowFunction.Context, elements):
-        bar = next(iter(elements))
-        bar.update(
-            {
-                "ticker": key,
-                "bar_size": self.bar_size,
-                "window_start": epoch_ms_to_iso(context.window().start),
-                "window_end": epoch_ms_to_iso(context.window().end),
-            }
-        )
-        yield bar
-
-
 def build(env: StreamExecutionEnvironment) -> None:
     source = kafka_json_source("nse.ticks.clean", group_id="flink-window-bars")
     from pyflink.common import WatermarkStrategy
@@ -118,7 +55,7 @@ def build(env: StreamExecutionEnvironment) -> None:
     parsed = (
         env.from_source(source, WatermarkStrategy.no_watermarks(), "ticks-clean")
         .map(json.loads)
-        .assign_timestamps_and_watermarks(tick_watermarks())
+        .assign_timestamps_and_watermarks(tick_watermarks(ooo_from_argv()))
     )
     keyed = parsed.key_by(lambda t: t["ticker"], key_type=Types.STRING())
 

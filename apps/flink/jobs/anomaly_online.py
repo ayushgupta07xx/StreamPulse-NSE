@@ -43,6 +43,7 @@ from common.pipeline import (  # noqa: E402
     kafka_exactly_once_sink,
     kafka_json_source,
     make_env,
+    ooo_from_argv,
     tick_watermarks,
     ts_to_epoch_ms,
 )
@@ -173,7 +174,7 @@ def build(env: StreamExecutionEnvironment) -> None:
     (
         env.from_source(source, WatermarkStrategy.no_watermarks(), "ticks-clean-anomaly")
         .map(json.loads)
-        .assign_timestamps_and_watermarks(tick_watermarks())
+        .assign_timestamps_and_watermarks(tick_watermarks(ooo_from_argv()))
         .key_by(lambda t: t["ticker"], key_type=T.STRING())
         .process(OnlineDetectors(), output_type=T.STRING())
         .sink_to(kafka_exactly_once_sink("nse.anomalies", "anomaly-online"))

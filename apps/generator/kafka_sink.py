@@ -21,6 +21,8 @@ TOPIC_SPECS = {
     "nse.bars.15m": {"partitions": 3, "retention_ms": 90 * 24 * 3600 * 1000},
     "nse.anomalies": {"partitions": 3, "retention_ms": 30 * 24 * 3600 * 1000},
     "nse.bars.late": {"partitions": 1, "retention_ms": 7 * 24 * 3600 * 1000},
+    # extension to §13: session-window summaries (5-min gap), see ADR-008
+    "nse.bars.session": {"partitions": 3, "retention_ms": 7 * 24 * 3600 * 1000},
 }
 
 
