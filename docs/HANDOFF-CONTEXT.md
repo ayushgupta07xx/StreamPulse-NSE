@@ -112,8 +112,15 @@
   `models/`. predict_loop verified: 2,600 bars → 50 flags → `anomalies_ml` +
   `isolation_forest` events to `nse.anomalies`. CronJob (k8s) +
   `scheduled-retrain.yml` (GH cron) exist.
-- **Day 10 🔶 IN FLIGHT — exact resume state in §7.**
-- **Days 11–14 ⬜** — plan + status in §8.
+- **Day 10 ✅** 4-method benchmark vs 200 injected anomalies finished
+  (commit 5f5f8af): final table + tuning story in docs/detection-benchmarks.md.
+  EWMA retuned on measurement — see §6/§7 for the updated config and lessons.
+- **Day 13(a) ✅ early:** CI fully green end to end (run after 732eb71) — k3d
+  root cause was charts hardcoding kind's `standard` StorageClass (k3s has
+  none; PVCs now use the cluster default). sqlfluff config lives in
+  pyproject.toml ([tool.sqlfluff.core] — it overrides .sqlfluff), hadolint
+  failure-threshold=warning, actions upgraded for Node 24.
+- **Days 11, 12, 13(b-d), 14 ⬜** — plan + status in §8.
 
 ## 5. THE deep technical lessons (do not relearn these)
 
@@ -164,45 +171,38 @@
 
 - Z-score (price vs 5-min rolling window): warmup 60 ticks; **two-tier**:
   |z| ≥ 6 fires instantly; 4 ≤ |z| < 6 needs 2 consecutive ticks.
-- EWMA SPC on **log-returns** (λ=0.2): mean chart with WE rules 1–2 ONLY
-  (rules 3–4 saturate on returns); **dispersion chart** = fast(λ=.2)/slow
-  (0.98/0.02, frozen while ratio ≥ 3) variance ratio > 6 → volatility bursts;
-  EWMA warmup 240 ticks.
+- EWMA SPC on **log-returns** (λ=0.2), retuned Day 10 on measurement:
+  **mean chart = |EWMA| > 6σ_ewma** (WE rules dropped — fat-tailed tick
+  returns saturate them); **dispersion chart** = fast/slow variance ratio
+  > **10**; slow baseline updates UNCONDITIONALLY during the 240-tick warmup
+  (freeze-gate deadlock fix), frozen during bursts after; **out-of-order
+  ticks are skipped per key** (keyless clean topic ⇒ partition interleave ⇒
+  artificial zigzag returns; measured 1,316 vs 39 dispersion alarms).
 - 120 s per-(ticker, method) cooldown. FPs eat cooldowns and suppress TPs —
   precision work directly buys recall.
 - VOLUME_SURGE (~50/200 of truth) is invisible to both by design → IF's job.
-- KNOWN CONCERN: in the in-flight Day 10 session ewma_spc has 6,041 events
-  (near cooldown saturation) — precision likely still poor; the pending
-  evaluation will quantify. If tuning further: suspect the dispersion rule's
-  frozen-slow-variance trap and WE2 on autocorrelated EWMA.
+- Final benchmark (sess-533880cc7830, grace 330 s): zscore P=.19 R=.615
+  lat 16 event-s; ewma_spc P=.597 R=.52 F1=.556; IF P=.135 R=.08 (single-day
+  in-sample training — multi-day corpus is the known improvement); ARIMA
+  P=.135 R=.035. Settled per the try-then-settle rule; full story in
+  docs/detection-benchmarks.md.
 
-## 7. EXACT Day 10 resume point (do this first)
+## 7. Day 10 lessons (kept so they're not relearned)
 
-State: benchmark session streamed & drained — seed **777**, 200 anomalies,
-**680 s at 25×** (17,000 event-s, ≈56 5m bars/ticker), 3 Flink jobs at
-parallelism 1, `--ooo-seconds 240 --idle-seconds 0`. Truth:
-`data/anomaly_ground_truth.json` (sess id inside; matches this session).
-In ClickHouse `nse.anomalies`: zscore 775, ewma_spc 6041, isolation_forest 160
-(predict_loop was stopped partway — IF events partial), arima_residual 0 (not
-run yet). ARIMA smoke-tested separately (800 bars → 9 events) ✅.
-
-Resume commands (PowerShell, cwd = repo root):
-```powershell
-$env:PYTHONPATH="apps"; $env:PYTHONUTF8="1"
-# 1. IF scoring over the session's 5m bars (resumes its consumer group; slow ~10 min)
-.\.venv\Scripts\python.exe -m ml.predict_loop run --max-bars 3400
-# 2. ARIMA over same bars
-.\.venv\Scripts\python.exe -m ml.arima_forecast run --max-bars 3400
-# 3. Official evaluation (grace 330 s for bar-close methods — documented choice)
-.\.venv\Scripts\python.exe tests\benchmarks\evaluate_detection.py --grace-s 330 --markdown
-# 4. Paste the table into docs/detection-benchmarks.md at <!-- BENCHMARK_TABLE -->
-#    (methodology + failure-modes sections already written), update PROGRESS.md, commit.
-```
-predict_loop slowness = per-bar pandas feature rebuild + per-row CH insert;
-if it crawls, batching the inserts is a legitimate improvement. If the bars
-topic was reset meanwhile, re-stream: reset_pipeline (3 jobs, p=1, ooo 240,
-idle 0) + `python -m generator.main run --speed 25 --duration-s 680 --anomalies 200 --seed 777`,
-drain (lag<50 on flink-anomaly-online AND flink-window-bars), then 1–3.
+1. **Tune detectors offline first**: replaying a session's ticks from
+   ClickHouse through a faithful copy of the detector logic lets you sweep
+   configs in minutes instead of one ~40-min pipeline cycle per attempt.
+   Caveat: the offline replay is perfectly event-time-ordered — it CANNOT
+   reproduce disorder-sensitive behavior (that's how the dispersion-chart
+   storm was missed until the live re-run).
+2. **An evaluator can flatter a saturated detector**: ewma's old R=.965 was
+   an artifact of firing everywhere; precision collapsed once the baseline
+   deadlock was fixed and the real recall surfaced.
+3. predict_loop/arima_forecast have **no idle exit** — with --max-bars above
+   the topic's message count they poll forever. Watch group lag (ml-predict-
+   loop, ml-arima) and stop them at 0.
+4. anomalies/anomalies_ml are **plain MergeTree** (no dedupe): never re-run
+   scoring over a partially-scored topic without truncating + group reset.
 
 ## 8. Remaining days — exact plans
 
