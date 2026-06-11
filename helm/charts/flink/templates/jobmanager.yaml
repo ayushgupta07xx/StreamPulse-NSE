@@ -52,6 +52,7 @@ spec:
             - { name: checkpoints, mountPath: /opt/flink/checkpoints }
             - { name: jobs, mountPath: /opt/streampulse/flink/jobs }
             - { name: jobs-common, mountPath: /opt/streampulse/flink/jobs/common }
+            - { name: jobs-common-pb, mountPath: /opt/streampulse/flink/jobs/common/pb }
             - { name: refdata, mountPath: /opt/streampulse/data }
       volumes:
         - name: checkpoints
@@ -62,6 +63,9 @@ spec:
         - name: jobs-common
           configMap:
             name: {{ .Release.Name }}-flink-jobs-common
+        - name: jobs-common-pb
+          configMap:
+            name: {{ .Release.Name }}-flink-jobs-common-pb
         - name: refdata
           configMap:
             name: {{ .Release.Name }}-flink-refdata

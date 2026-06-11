@@ -17,6 +17,15 @@ metadata:
 data:
 {{ (.Files.Glob "files/common/*.py").AsConfig | indent 2 }}
 ---
+# generated protobuf bindings (scripts/gen_proto.py) — third ConfigMap because
+# ConfigMaps are flat and these live in the common/pb subpackage
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-flink-jobs-common-pb
+data:
+{{ (.Files.Glob "files/common/pb/*.py").AsConfig | indent 2 }}
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:

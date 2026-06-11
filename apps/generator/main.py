@@ -74,6 +74,10 @@ def run(
     ),
     bootstrap: str = typer.Option(os.environ.get("KAFKA_BOOTSTRAP", "localhost:29092")),
     topic: str = typer.Option("nse.ticks.raw"),
+    format: str = typer.Option(
+        os.environ.get("TICK_FORMAT", "json"),
+        help="json | protobuf (Confluent-framed, schema registry; kafka target only)",
+    ),
     tickers: str = typer.Option(os.environ.get("TICKERS", "ALL"), help="ALL or comma-separated"),
     trading_date: str = typer.Option("latest", help="YYYY-MM-DD from historical data, or 'latest'"),
     anomalies: int = typer.Option(12, help="number of anomalies to inject across the session"),
@@ -149,6 +153,12 @@ def run(
     log.info("ground truth (%d anomalies) → %s", len(records), ground_truth_out)
 
     # ── Stream ────────────────────────────────────────────────────────────
+    if format not in ("json", "protobuf"):
+        raise typer.BadParameter(f"unknown format {format!r} (json | protobuf)")
+    if format == "protobuf" and target != "kafka":
+        # kinesis/pubsub paths archive JSONL downstream — protobuf is the
+        # Kafka + schema-registry story (brief §20)
+        raise typer.BadParameter("--format protobuf requires --target kafka")
     sink: Any  # TickSink | KinesisSink | PubSubSink — duck-typed send/flush
     if target == "kinesis":
         from generator.aws_target import KinesisSink
@@ -160,7 +170,13 @@ def run(
         sink = PubSubSink()
     else:
         ensure_topics(bootstrap)
-        sink = TickSink(bootstrap, topic)
+        serializer = None
+        if format == "protobuf":
+            from generator.proto_format import ProtobufTickSerializer
+
+            serializer = ProtobufTickSerializer()
+            log.info("protobuf wire format, registry schema id %d", serializer.schema_id)
+        sink = TickSink(bootstrap, topic, serializer=serializer)
     sides = {t: synth_sides(paths[t]["prices"], rng) for t in universe}
     seqs = dict.fromkeys(universe, 0)
 

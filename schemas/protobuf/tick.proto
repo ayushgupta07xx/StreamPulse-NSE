@@ -1,0 +1,38 @@
+// Phase 2 schema (brief §20): one trade tick.
+// nse.ticks.raw carries the bare fields; nse.ticks.clean (validate_enrich
+// output) fills the enrichment fields 9-12.
+//
+// timestamp_ist stays an ISO-8601 string (+05:30 offset) rather than
+// google.protobuf.Timestamp: the JSON and protobuf paths run concurrently
+// (brief §22 risk register) and every consumer already parses the ISO form —
+// one timestamp representation end to end beats a per-format branch.
+//
+// Regenerate bindings: python scripts/gen_proto.py
+syntax = "proto3";
+
+package nse.v1;
+
+message Tick {
+  string ticker = 1;
+  string timestamp_ist = 2;
+  double price = 3;
+  uint64 volume = 4;
+
+  enum Side {
+    SIDE_UNSPECIFIED = 0;
+    BUY = 1;
+    SELL = 2;
+  }
+  Side side = 5;
+
+  string exchange = 6;
+  string session_id = 7;
+  // per-ticker monotonic sequence — exactly-once verification (Day 3)
+  uint64 seq = 8;
+
+  // enrichment (clean topic only)
+  string name = 9;
+  string sector = 10;
+  string industry = 11;
+  string mcap_bucket = 12;
+}

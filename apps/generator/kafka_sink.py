@@ -52,10 +52,15 @@ def ensure_topics(bootstrap: str) -> None:
 
 
 class TickSink:
-    """Batched, idempotent JSON producer keyed by ticker."""
+    """Batched, idempotent producer keyed by ticker.
 
-    def __init__(self, bootstrap: str, topic: str = "nse.ticks.raw") -> None:
+    Values are JSON by default; pass `serializer` (Tick → bytes) to switch the
+    wire format — e.g. proto_format.ProtobufTickSerializer (brief §20 Phase 2).
+    """
+
+    def __init__(self, bootstrap: str, topic: str = "nse.ticks.raw", serializer=None) -> None:
         self.topic = topic
+        self._serialize = serializer or Tick.to_json_bytes
         self._producer = Producer(
             {
                 "bootstrap.servers": bootstrap,
@@ -83,7 +88,7 @@ class TickSink:
                 self._producer.produce(
                     self.topic,
                     key=tick.ticker.encode(),
-                    value=tick.to_json_bytes(),
+                    value=self._serialize(tick),
                     timestamp=event_ms,
                     on_delivery=self._on_delivery,
                 )

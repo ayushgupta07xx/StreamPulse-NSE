@@ -15,6 +15,7 @@ def sync(src: str, dst: str, pattern: str) -> None:
 sync("clickhouse", "helm/charts/clickhouse/files", "*.sql")
 sync("apps/flink/jobs", "helm/charts/flink/files/jobs", "*.py")
 sync("apps/flink/jobs/common", "helm/charts/flink/files/common", "*.py")
+sync("apps/flink/jobs/common/pb", "helm/charts/flink/files/common/pb", "*.py")
 sync("observability/grafana/dashboards", "helm/charts/grafana/files/dashboards", "*.json")
 sync("data", "helm/charts/flink/files/data", "*.csv")
 print("helm chart files synced")

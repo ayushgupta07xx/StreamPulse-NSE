@@ -1,0 +1,23 @@
+// Phase 2 schema (brief §20): one OHLCV bar.
+// Subjects: nse.bars.1m / nse.bars.5m / nse.bars.15m / nse.bars.late /
+// nse.bars.session (one message type, bar_size + window bounds distinguish).
+// Window bounds stay ISO-8601 strings — see tick.proto for the rationale.
+//
+// Regenerate bindings: python scripts/gen_proto.py
+syntax = "proto3";
+
+package nse.v1;
+
+message Bar {
+  string ticker = 1;
+  string bar_size = 2; // "1m" | "5m" | "15m" | "session"
+  string window_start = 3;
+  string window_end = 4;
+  double open = 5;
+  double high = 6;
+  double low = 7;
+  double close = 8;
+  uint64 volume = 9;
+  double vwap = 10;
+  uint64 tick_count = 11;
+}

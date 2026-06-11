@@ -32,6 +32,8 @@ sys.path.insert(0, "/opt/streampulse/flink/jobs")
 
 from common.pipeline import (  # noqa: E402
     dumps,
+    format_from_argv,
+    kafka_bytes_source,
     kafka_exactly_once_sink,
     kafka_json_source,
     load_metadata,
@@ -47,7 +49,18 @@ _MAX_TS = datetime(2035, 1, 1).timestamp() * 1000
 
 
 class ValidateEnrich(FlatMapFunction):
-    """str(JSON tick) → str(enriched JSON); rejects emit nothing."""
+    """str(tick) → str(enriched JSON); rejects emit nothing.
+
+    Input is JSON by default. With fmt="protobuf" the source delivers
+    Confluent-framed protobuf as a latin-1 string (lossless byte carrier —
+    see kafka_bytes_source); output stays JSON either way: nse.ticks.clean
+    feeds the ClickHouse Kafka engine (JSONEachRow) and the windowing jobs,
+    which keeps the two ingest formats concurrent per the brief §22 risk
+    register without forking the downstream.
+    """
+
+    def __init__(self, fmt: str = "json") -> None:
+        self.fmt = fmt
 
     def open(self, runtime_context: RuntimeContext) -> None:
         self.metadata = load_metadata()
@@ -57,8 +70,13 @@ class ValidateEnrich(FlatMapFunction):
 
     def flat_map(self, raw: str):
         try:
-            tick = json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
+            if self.fmt == "protobuf":
+                from common.proto_codec import tick_from_confluent
+
+                tick = tick_from_confluent(raw.encode("latin-1"))
+            else:
+                tick = json.loads(raw)
+        except (json.JSONDecodeError, TypeError, ValueError, IndexError):
             self.rejected.inc()
             return
 
@@ -90,7 +108,11 @@ class ValidateEnrich(FlatMapFunction):
 
 
 def build(env: StreamExecutionEnvironment) -> None:
-    source = kafka_json_source("nse.ticks.raw", group_id="flink-validate-enrich")
+    fmt = format_from_argv()
+    if fmt == "protobuf":
+        source = kafka_bytes_source("nse.ticks.raw", group_id="flink-validate-enrich")
+    else:
+        source = kafka_json_source("nse.ticks.raw", group_id="flink-validate-enrich")
     sink = kafka_exactly_once_sink("nse.ticks.clean", transactional_prefix="validate-enrich")
 
     (
@@ -100,7 +122,7 @@ def build(env: StreamExecutionEnvironment) -> None:
         env.from_source(source, record_ts_watermarks(ooo_from_argv()), "ticks-raw")
         # output_type is load-bearing: the Java Kafka sink needs Java Strings,
         # not pickled Python bytes (ADR-007)
-        .flat_map(ValidateEnrich(), output_type=Types.STRING())
+        .flat_map(ValidateEnrich(fmt), output_type=Types.STRING())
         .sink_to(sink)
         .name("ticks-clean-sink")
         # SINGLE producer: two parallel sink subtasks interleave into the same

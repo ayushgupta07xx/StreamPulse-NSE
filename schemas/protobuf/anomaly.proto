@@ -1,0 +1,19 @@
+// Phase 2 schema (brief §20): one detection event on nse.anomalies.
+// `context` carries the per-method JSON payload (z, dev_sigma, vol_ratio,
+// model_version, ...) — schemaless by design: each detector owns its context
+// shape and the ensemble layer only reads the typed envelope fields.
+//
+// Regenerate bindings: python scripts/gen_proto.py
+syntax = "proto3";
+
+package nse.v1;
+
+message Anomaly {
+  string ticker = 1;
+  string ts = 2; // ISO-8601, event time of the offending tick/bar
+  string detection_method = 3; // zscore | ewma_spc | isolation_forest | arima_residual
+  double score = 4;
+  uint32 severity = 5;
+  string context = 6; // method-specific JSON
+  string session_id = 7;
+}

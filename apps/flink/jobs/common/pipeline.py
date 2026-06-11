@@ -58,6 +58,22 @@ def ooo_from_argv(default_s: int = OUT_OF_ORDERNESS_S) -> int:
     return _argv_int("--ooo-seconds", default_s)
 
 
+def format_from_argv(default: str = "json") -> str:
+    """--format {json|protobuf} (job argv, graph-build time). JSON is default;
+    protobuf is the Phase 2 ingest path (brief §20, schemas/protobuf/)."""
+    import sys
+
+    argv = sys.argv
+    if "--format" in argv:
+        try:
+            value = argv[argv.index("--format") + 1]
+            if value in ("json", "protobuf"):
+                return value
+        except IndexError:
+            pass
+    return default
+
+
 def idle_from_argv(default_s: int = IDLENESS_S) -> int:
     """--idle-seconds N (0 disables idleness).
 
@@ -102,6 +118,28 @@ def kafka_json_source(topic: str, group_id: str) -> KafkaSource:
         )
         .set_property("isolation.level", "read_committed")
         .set_value_only_deserializer(SimpleStringSchema())
+        .build()
+    )
+
+
+def kafka_bytes_source(topic: str, group_id: str) -> KafkaSource:
+    """Binary-value Kafka source for Confluent-framed protobuf records.
+
+    PyFlink 1.18 has no byte-array deserializer, but SimpleStringSchema
+    accepts a charset — and ISO-8859-1 maps bytes 0-255 to codepoints 1:1,
+    so `value.encode('latin-1')` downstream recovers the exact payload bytes
+    losslessly (see common/proto_codec.py).
+    """
+    return (
+        KafkaSource.builder()
+        .set_bootstrap_servers(BOOTSTRAP)
+        .set_topics(topic)
+        .set_group_id(group_id)
+        .set_starting_offsets(
+            KafkaOffsetsInitializer.committed_offsets(KafkaOffsetResetStrategy.EARLIEST)
+        )
+        .set_property("isolation.level", "read_committed")
+        .set_value_only_deserializer(SimpleStringSchema("ISO-8859-1"))
         .build()
     )
 

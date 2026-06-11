@@ -46,6 +46,8 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# generated protobuf bindings (scripts/gen_proto.py)
+extend-exclude = ["**/pb/*_pb2.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B", "SIM"]

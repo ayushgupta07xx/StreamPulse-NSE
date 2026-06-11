@@ -59,7 +59,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install deps
-        run: pip install pydantic numpy pandas pyarrow pytest prometheus-client confluent-kafka typer tzdata
+        run: pip install pydantic numpy pandas pyarrow pytest prometheus-client confluent-kafka typer tzdata protobuf
       - name: pytest
         run: PYTHONPATH=apps pytest tests/unit -q
 
