@@ -77,7 +77,8 @@ def truncate_clickhouse() -> None:
     print(f"clickhouse truncated: {', '.join(CH_TABLES)}")
 
 
-def submit(job: str, ooo_seconds: int | None, idle_seconds: int | None) -> None:
+def submit(job: str, ooo_seconds: int | None, idle_seconds: int | None,
+           parallelism: int | None = None) -> None:
     cmd = JM + [
         "flink", "run",
         "-py", f"/opt/streampulse/flink/jobs/{job}.py",
@@ -88,6 +89,8 @@ def submit(job: str, ooo_seconds: int | None, idle_seconds: int | None) -> None:
         cmd += ["--ooo-seconds", str(ooo_seconds)]
     if idle_seconds is not None:
         cmd += ["--idle-seconds", str(idle_seconds)]
+    if parallelism is not None:
+        cmd += ["--parallelism", str(parallelism)]
     out = sh(cmd)
     print(out.splitlines()[-1] if out else f"submitted {job}")
 
@@ -101,6 +104,7 @@ def main() -> int:
     )
     ap.add_argument("--jobs", default="validate_enrich,window_bars", help=f"comma list from {ALL_JOBS}")
     ap.add_argument("--keep-clickhouse", action="store_true", help="skip truncating ClickHouse tables")
+    ap.add_argument("--parallelism", type=int, default=None, help="per-job parallelism override")
     args = ap.parse_args()
 
     cancel_all_jobs()
@@ -109,7 +113,7 @@ def main() -> int:
     if not args.keep_clickhouse:
         truncate_clickhouse()
     for job in [j.strip() for j in args.jobs.split(",") if j.strip()]:
-        submit(job, args.ooo_seconds, args.idle_seconds)
+        submit(job, args.ooo_seconds, args.idle_seconds, args.parallelism)
     print("pipeline reset complete")
     return 0
 

@@ -22,7 +22,10 @@ import typer
 from confluent_kafka import Consumer, Producer
 from statsmodels.tsa.arima.model import ARIMA
 
-WARMUP_BARS = 50
+# 24 bars = 2 h of 5m closes: enough for ARIMA(1,1,1) MLE to stabilize while
+# leaving most of a replay session for scoring (50 was longer than a typical
+# benchmark session yields per ticker)
+WARMUP_BARS = 24
 RESIDUAL_THRESHOLD = 3.0
 ORDER = (1, 1, 1)
 

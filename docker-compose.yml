@@ -222,6 +222,26 @@ services:
       - prometheus
       - clickhouse
 
+  # ──────────────────────────── AWS emulation (Day 11) ────────────────────────────
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: streampulse-localstack
+    profiles: [aws]
+    ports:
+      - "4566:4566"             # unified edge endpoint
+    environment:
+      SERVICES: kinesis,s3,lambda,dynamodb,glue,iam,sts,logs,cloudwatch
+      LAMBDA_DOCKER_NETWORK: streampulse_default
+      PERSISTENCE: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock   # lambda container executor
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"kinesis\": \"\\(running\\|available\\)\"'"]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 30s
+
   # ──────────────────────────── ML tracking ────────────────────────────
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.16.2

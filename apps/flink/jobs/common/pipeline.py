@@ -69,7 +69,19 @@ def idle_from_argv(default_s: int = IDLENESS_S) -> int:
 
 
 def make_env(parallelism: int = 2) -> StreamExecutionEnvironment:
-    """Stream env with exactly-once checkpointing (matches FLINK_PROPERTIES)."""
+    """Stream env with exactly-once checkpointing (matches FLINK_PROPERTIES).
+
+    --parallelism N (job argv) overrides — lets all three jobs co-exist on a
+    small slot budget for full-ensemble benchmark runs.
+    """
+    import sys
+
+    argv = sys.argv
+    if "--parallelism" in argv:
+        try:
+            parallelism = int(argv[argv.index("--parallelism") + 1])
+        except (IndexError, ValueError):
+            pass
     env = StreamExecutionEnvironment.get_execution_environment()
     env.set_parallelism(parallelism)
     env.enable_checkpointing(10_000, CheckpointingMode.EXACTLY_ONCE)
