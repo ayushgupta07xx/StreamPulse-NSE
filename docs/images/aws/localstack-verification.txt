@@ -1,0 +1,74 @@
+# Day 11 — LocalStack AWS parallel pipeline verification
+# Captured 2026-06-11T16:03:50Z — LocalStack 3.8, region ap-south-1
+
+## Generator run
+31,500 ticks emitted to Kinesis in 122 s (258 ticks/s at 10x, 50 tickers)
+
+## Kinesis
+{
+    "StreamNames": [
+        "nse-ticks-raw"
+    ]
+}
+
+## Lambda event source mapping
+[
+    {
+        "arn": "arn:aws:kinesis:ap-south-1:000000000000:stream/nse-ticks-raw",
+        "state": "Enabled",
+        "batch": 500
+    }
+]
+
+## DynamoDB keyed state (last price per ticker)
+{
+    "Count": 50,
+    "ScannedCount": 50,
+    "ConsumedCapacity": null
+}
+### sample items
+{
+    "Items": [
+        {
+            "state_key": {
+                "S": "last_price"
+            },
+            "ticker": {
+                "S": "INFY"
+            },
+            "price": {
+                "S": "1128.28"
+            },
+            "ts": {
+                "S": "2026-06-11T09:25:29+05:30"
+            }
+        },
+        {
+            "state_key": {
+                "S": "last_price"
+            },
+            "ticker": {
+                "S": "BAJFINANCE"
+            },
+            "price": {
+                "S": "878.6"
+            },
+            "ts": {
+                "S": "2026-06-11T09:25:29+05:30"
+            }
+        }
+    ],
+    "Count": 50,
+    "ScannedCount": 50,
+    "ConsumedCapacity": null,
+    "NextToken": "eyJFeGNsdXNpdmVTdGFydEtleSI6IG51bGwsICJib3RvX3RydW5jYXRlX2Ftb3VudCI6IDJ9"
+}
+
+## S3 archive (JSONL, date-partitioned)
+object count: 65
+2026-06-11 16:02:06     100398 raw/2026-06-11/e8a42bc9-7095-4c4f-b329-608d4fc5fded.jsonl
+2026-06-11 15:57:32     101275 raw/2026-06-11/ea4b6564-a41d-457d-a47e-d2b5ec1ce273.jsonl
+2026-06-11 15:58:54     101252 raw/2026-06-11/ed104324-c082-49df-850f-ebaa0d744605.jsonl
+2026-06-11 15:55:20      24052 raw/2026-06-11/f2bf109b-d31b-4f98-b8da-213f7850ea6c.jsonl
+2026-06-11 15:58:19     101460 raw/2026-06-11/f4acf702-24ca-451e-bc85-5ac7bbcf326d.jsonl
+total archived ticks: 31500 of 31500 emitted

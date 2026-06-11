@@ -36,6 +36,7 @@ resource "aws_s3_bucket" "archive" {
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "archive" {
+  count  = var.localstack_mode ? 0 : 1 # LocalStack: read-back never converges
   bucket = aws_s3_bucket.archive.id
   rule {
     id     = "expire-raw-ticks"
@@ -139,12 +140,16 @@ resource "aws_lambda_event_source_mapping" "kinesis_trigger" {
 }
 
 # ── Glue: catalog over the S3 archive (light usage) ──────────────────────
+# Glue is a LocalStack Pro feature — validated by `terraform validate` and
+# created only against real AWS (localstack_mode = false).
 resource "aws_glue_catalog_database" "streampulse" {
-  name = "streampulse"
+  count = var.localstack_mode ? 0 : 1
+  name  = "streampulse"
 }
 
 resource "aws_glue_catalog_table" "ticks_archive" {
-  database_name = aws_glue_catalog_database.streampulse.name
+  count         = var.localstack_mode ? 0 : 1
+  database_name = aws_glue_catalog_database.streampulse[0].name
   name          = "ticks_raw_archive"
   table_type    = "EXTERNAL_TABLE"
 

@@ -47,9 +47,14 @@ aws --endpoint-url http://localhost:4566 dynamodb scan --table-name streampulse-
 
 1. Remove/blank the `endpoints` block in `envs/local/main.tf` (or use a
    separate `envs/aws` with real credentials).
-2. `terraform apply`. Same module, same resources; S3 bucket names must be
+2. Set `localstack_mode = false` on the module — this enables the two
+   resources LocalStack Community cannot emulate (measured on 3.8, not
+   assumed): the Glue catalog returns 501 (Pro-only feature) and the S3
+   lifecycle configuration's read-back never converges, timing out the
+   provider after 3 minutes. Both are still `terraform validate`d in CI.
+3. `terraform apply`. Same module, same resources; S3 bucket names must be
    globally unique (override `var.archive_bucket`).
 
-LocalStack Community covers every service used here (Kinesis, S3, Lambda,
-DynamoDB, IAM, Glue catalog operations); no Pro-only features are required
-(§20 risk register).
+Everything actually exercised in the local cycle — Kinesis, S3, Lambda +
+event source mapping, DynamoDB, IAM, CloudWatch Logs — runs on LocalStack
+Community at $0.

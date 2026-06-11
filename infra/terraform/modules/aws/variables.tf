@@ -28,3 +28,9 @@ variable "state_table" {
   type    = string
   default = "streampulse-state"
 }
+
+variable "localstack_mode" {
+  description = "Skip resources LocalStack community cannot emulate (Glue catalog is Pro-only; S3 lifecycle read-back never converges). Set false against real AWS."
+  type        = bool
+  default     = true
+}
