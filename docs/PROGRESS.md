@@ -27,7 +27,7 @@
 - [x] **Day 7** — full pipeline VERIFIED on kind (3 nodes): umbrella chart (7 subcharts), post-install hooks applied schema + submitted all 3 Flink jobs, 1.25M ticks / 2.3K bars / 7.6K anomalies in CH-on-k8s. k8s defects fixed: ConfigMap dir-shadowing (subPath!), CH startupProbe, pinned TM ports, submit-pod KAFKA_BOOTSTRAP, image-baked data. Evidence: docs/images/k8s-get-all.txt. kind torn down post-verification (make k8s recreates)
 - [x] **Day 8** — online detectors live + benchmarked vs 200 injected anomalies (~150 price-visible; volume surges await IF). zscore: P=.29 R=.30 latency 6 event-s (≈0.24 s wall @1×); ewma_spc (mean+dispersion charts): P=.07 R=.46 latency 62 event-s; ensemble(≥2) R=.25. Honest numbers per §22.5; full 4-method benchmark on Day 10. Fixed en route: evaluator timezone bug (naive-UTC vs IST → zero matches), replay state-poisoning guard (backwards event-time jump resets keyed state), reset script verifies cancellations.
 - [x] **Day 9** — IF v21e618c9 trained on full-day corpus (2,056 rows, val flag rate 1.02% ≈ contamination), MLflow run + joblib artifacts + version JSON. predict_loop: 2,600 bars scored, 50 flagged → anomalies_ml + ensemble topic. Fixes: TM slots 4→2 + 2g hard limit + restart policy (OOM-proof), corrupted MLflow volume wiped, PYTHONUTF8 for Windows console, utc=True for mixed-tz bars.
-- [ ] Day 10 — ARIMA residuals + 4-method benchmark report
+- [x] **Day 10** — ARIMA residual detector verified (52 events), 4-method benchmark vs 200-anomaly ground truth in docs/detection-benchmarks.md. EWMA retuned on measurement: frozen-baseline deadlock fixed, WE rules dropped for 6σ mean chart + ratio-10 dispersion, out-of-order ticks skipped (keyless topic) — P 0.091→0.597, F1 0.166→0.556 at 18× fewer alerts.
 - [ ] Day 11 — LocalStack AWS (Kinesis/S3/Lambda/DynamoDB) via Terraform
 - [ ] Day 12 — GCP Pub/Sub + Dataflow cycle (**blocked on user**)
 - [ ] Day 13 — CI, Protobuf registry, Helm hardening, v0.1.0 tag
@@ -41,3 +41,10 @@
   Flink image = flink:1.18.1 + Python 3.10 + apache-flink pip (ADR-003).
   Day 2 data pulled; generator + Day 3/4/8 Flink jobs + Day 5 SQL written ahead,
   not yet executed. Next: run generator → verify throughput → Day 3 fault test.
+- **2026-06-11 (session 2):** Day 10 closed — benchmark evaluated, EWMA failure
+  modes diagnosed via offline tick replay (sweep against ground truth), detector
+  fixed and re-benchmarked across three full pipeline cycles. CI green end to end
+  (first time): sqlfluff rules tuned for ClickHouse DDL, hadolint threshold,
+  and the k3d root cause — charts hardcoded kind's `standard` StorageClass,
+  which k3s doesn't have; PVCs now use the cluster default. Next: Day 11
+  LocalStack cycle (all staged), then Day 13 protobuf + NetworkPolicies + tag.

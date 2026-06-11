@@ -54,10 +54,9 @@ def build(env: StreamExecutionEnvironment) -> None:
 
     # Watermarks AT the source from Kafka record timestamps: per-partition
     # tracking absorbs consumption skew, zero Python in the watermark path
-    parsed = (
-        env.from_source(source, record_ts_watermarks(ooo_from_argv(), idle_from_argv()), "ticks-clean")
-        .map(json.loads)
-    )
+    parsed = env.from_source(
+        source, record_ts_watermarks(ooo_from_argv(), idle_from_argv()), "ticks-clean"
+    ).map(json.loads)
     keyed = parsed.key_by(lambda t: t["ticker"], key_type=Types.STRING())
 
     late_streams = []

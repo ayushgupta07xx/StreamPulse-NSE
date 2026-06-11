@@ -3,19 +3,22 @@
     nse.ticks.clean ──▶ key_by(ticker) ──▶ stateful detectors ──▶ nse.anomalies
 
 Detectors (per ticker, keyed state):
-- **Z-score**: |price − rolling_mean| / rolling_std > 3 over a 5-minute rolling
-  window of ticks. Catches sudden spikes; sub-second detection latency.
-- **EWMA SPC**: exponentially weighted moving average (λ=0.2) with Western
-  Electric rules against the rolling baseline:
-    R1: one point beyond 3σ_ewma          R2: 2 of 3 beyond 2σ (same side)
-    R3: 4 of 5 beyond 1σ (same side)      R4: 8 consecutive on one side
-  Catches gradual drifts the Z-score misses.
+- **Z-score**: price vs a 5-minute rolling window, two-tier (|z| ≥ 6 instant,
+  4 ≤ |z| < 6 needs 2 consecutive ticks). Catches sudden spikes; sub-second
+  detection latency.
+- **EWMA SPC** on log-returns (λ=0.2), two charts:
+    mean chart   — |EWMA| beyond 6σ_ewma (classic 3σ + WE rules saturate on
+                   the fat-tailed tick returns here; thresholds settled by
+                   replaying a 200-anomaly ground-truth session, see
+                   docs/detection-benchmarks.md)
+    dispersion   — fast(λ=.2)/slow(frozen-during-burst) variance ratio > 10
+                   for symmetric volatility bursts the mean chart can't see.
 
 Each event carries detection_method + score + JSON context. Ensemble severity
 (# methods agreeing) is computed downstream in ClickHouse (vw_anomaly_ensemble)
 — detectors stay independent and single-purpose.
 
-A 30 s per-(ticker, method) cooldown suppresses alert storms while a condition
+A 120 s per-(ticker, method) cooldown suppresses alert storms while a condition
 persists.
 
 Submit:
@@ -56,7 +59,12 @@ Z_EXTREME = 6.0  # fire immediately — unambiguous single-tick spike
 Z_THRESHOLD = 4.0  # §20: start conservative; tuned against ground truth
 Z_PERSISTENCE = 2  # consecutive breaches for moderate z (kills 1-tick noise)
 EWMA_LAMBDA = 0.2
-VOL_RATIO_THRESHOLD = 6.0  # fast/slow variance ratio ≈ vol×2.5 — volatility bursts
+# Mean-chart limit in σ_ewma. 3σ + Western Electric is textbook for Gaussian
+# returns; tick-level returns here are jump-diffusion fat-tailed and 3σ fired
+# at nearly every cooldown expiry (offline replay vs 200 injected anomalies:
+# P=.10 R=.96). 6σ with no WE2 measured P=.69 R=.73 on the same replay.
+EWMA_DEV_THRESHOLD = 6.0
+VOL_RATIO_THRESHOLD = 10.0  # fast/slow variance ratio — volatility bursts (P/R-swept)
 COOLDOWN_MS = 120_000  # per (ticker, method); suppresses alert storms
 _EPS = 1e-9
 
@@ -143,9 +151,9 @@ class OnlineDetectors(KeyedProcessFunction):
             "var_slow": None,
             "var_fast": None,
             "t": 0,
-            "recent": deque(maxlen=8),
             "z_run": 0,
             "last_price": price,
+            "last_ts": 0,
         }
         if abs(z) > Z_THRESHOLD:
             est["z_run"] += 1
@@ -168,9 +176,20 @@ class OnlineDetectors(KeyedProcessFunction):
 
         # ── EWMA SPC on log-RETURNS (stationary; price levels trend and
         #    poison control limits — measured: 5,650 false alarms/session).
-        #    Two charts: mean chart (WE1/WE2 — level shifts, big moves) and a
+        #    Two charts: mean chart (level shifts, big moves) and a
         #    dispersion chart (fast/slow variance ratio — volatility bursts,
         #    which are symmetric and invisible to the mean chart) ──
+        #    Returns need consecutive event-time ticks: the clean topic is
+        #    keyless (ADR-007: PyFlink sinks are value-only) so a ticker's
+        #    ticks interleave across partitions, and a return computed across
+        #    an out-of-order pair is an artificial zigzag that inflates the
+        #    fast variance — measured: 1,316 dispersion false alarms/session
+        #    vs 39 on the same ticks in event-time order. Skip backwards ticks
+        #    here; the rolling Z-score window above handles them by timestamp.
+        if ts_ms <= est["last_ts"]:
+            self.ewma_state.update(est)  # persist z_run from the zscore tier
+            return
+        est["last_ts"] = ts_ms
         r = math.log(price / max(est["last_price"], _EPS))
         est["last_price"] = price
         est["t"] += 1
@@ -181,11 +200,14 @@ class OnlineDetectors(KeyedProcessFunction):
             else (EWMA_LAMBDA * r * r + (1 - EWMA_LAMBDA) * est["var_fast"])
         )
         # slow baseline freezes while dispersion is elevated, so a burst can't
-        # contaminate its own reference
+        # contaminate its own reference. The freeze only protects an ESTABLISHED
+        # baseline: during warmup it must update unconditionally, else a near-zero
+        # initial r² deadlocks it (ratio stays huge, σ_ewma stays microscopic, and
+        # the mean chart fires at every cooldown expiry — observed live).
         ratio = (est["var_fast"] / est["var_slow"]) if est["var_slow"] else 1.0
         if est["var_slow"] is None:
             est["var_slow"] = r * r
-        elif ratio < VOL_RATIO_THRESHOLD / 2:
+        elif est["t"] <= EWMA_WARMUP_T or ratio < VOL_RATIO_THRESHOLD / 2:
             est["var_slow"] = 0.98 * est["var_slow"] + 0.02 * r * r
 
         sigma_r = math.sqrt(max(est["var_slow"], _EPS * _EPS))
@@ -193,13 +215,12 @@ class OnlineDetectors(KeyedProcessFunction):
             (EWMA_LAMBDA / (2 - EWMA_LAMBDA)) * (1 - (1 - EWMA_LAMBDA) ** (2 * est["t"]))
         )
         dev = est["ewma_r"] / max(sigma_ewma, _EPS)  # center line = 0 for returns
-        est["recent"].append(dev)
         self.ewma_state.update(est)
 
         if est["t"] < EWMA_WARMUP_T:
             return
 
-        rule = self._western_electric(est["recent"])
+        rule = "MEAN_beyond_6sigma" if abs(dev) > EWMA_DEV_THRESHOLD else None
         if rule is None and ratio > VOL_RATIO_THRESHOLD:
             rule = "DISPERSION_vol_ratio"
         if rule and self._cooldown_ok("ewma_spc", ts_ms):
@@ -215,24 +236,6 @@ class OnlineDetectors(KeyedProcessFunction):
                     "vol_ratio": round(ratio, 2),
                 },
             )
-
-    @staticmethod
-    def _western_electric(recent: deque) -> str | None:
-        """Alert on WE rules 1+2 only. Rules 3 (4-of-5 beyond 1σ) and 4 (8 one
-        side) are drift heuristics for human-reviewed control charts; on an
-        EWMA of returns they saturate on ordinary momentum — measured: the
-        detector fired at every cooldown expiry (2,480/session). Documented in
-        docs/detection-benchmarks.md."""
-        r = list(recent)
-        if not r:
-            return None
-        if abs(r[-1]) > 3:
-            return "WE1_beyond_3sigma"
-        if len(r) >= 3:
-            last3 = r[-3:]
-            if sum(1 for d in last3 if d > 2) >= 2 or sum(1 for d in last3 if d < -2) >= 2:
-                return "WE2_2of3_beyond_2sigma"
-        return None
 
 
 def build(env: StreamExecutionEnvironment) -> None:

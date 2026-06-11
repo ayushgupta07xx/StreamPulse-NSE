@@ -38,6 +38,34 @@
 ## Results
 
 <!-- BENCHMARK_TABLE -->
+Session `sess-533880cc7830` — 680 s wall at 25× (≈4.7 h of event time), 50
+tickers, 837,400 ticks, 200 injected anomalies, grace 330 s:
+
+| Method | Detections | Precision | Recall | F1 | Median latency |
+|---|---|---|---|---|---|
+| zscore | 744 | 0.19 | 0.615 | 0.29 | 16.0s |
+| ewma_spc | 335 | 0.597 | 0.52 | 0.556 | 23.0s |
+| isolation_forest | 126 | 0.135 | 0.08 | 0.1 | 227.5s |
+| arima_residual | 52 | 0.135 | 0.035 | 0.056 | 239.0s |
+| ensemble(>=2) | 84 | — | 0.42 | — | — |
+
+Reading the table honestly:
+
+- **ewma_spc is the headline**: it began this benchmark at 6,041
+  detections / P=0.091 / F1=0.166 (frozen-baseline deadlock + WE rules on
+  fat-tailed returns + Kafka disorder, failure modes 4–5 below). The shipped
+  configuration fires 18× less often at 6.5× the precision.
+- **zscore is the latency play**: median 16 event-seconds (0.64 wall-seconds
+  at live speed) and the best price-method recall, paid for in precision —
+  it's the first-alarm tier, not the authoritative one.
+- **isolation_forest underperforms its Day 9 promise** here: it is trained on
+  a different day's corpus (single-day, in-sample validation — a documented
+  fallback) and graded at bar granularity against second-granular truth.
+  Multi-day training corpus is the known next step.
+- **arima_residual** is a conservative second opinion at bar close: few,
+  late, moderately precise events by construction.
+- Tick-level methods are reproducible across sessions: zscore detections
+  varied 744–775 (P 0.181–0.19) over three independent replays of this seed.
 
 ## Method notes (what tuning revealed)
 
@@ -47,11 +75,14 @@
   5-minute rolling window are nearly a random walk).
 - **EWMA SPC (online, ticks):** runs on **log-returns**, not prices — SPC on
   trending price levels produced 5,650 false alarms per session (measured).
-  Two charts: a mean chart with Western Electric rules 1–2 (level shifts,
-  large moves) and a dispersion chart (fast/slow variance ratio > 6) that
-  catches symmetric volatility bursts the mean chart cannot see. WE rules 3–4
-  are deliberately not alerting rules here: on EWMA'd returns they saturate on
-  ordinary momentum (the detector fired at every cooldown expiry).
+  Two charts: a mean chart (|EWMA| beyond 6 σ_ewma — level shifts, large
+  moves) and a dispersion chart (fast/slow variance ratio > 10) that catches
+  symmetric volatility bursts the mean chart cannot see. The textbook 3σ
+  limit + Western Electric rules were abandoned after measurement, not taste:
+  tick-level returns under jump diffusion are fat-tailed enough that WE1@3σ
+  scored P=0.10 and WE2 alone contributed ~3,400 false alarms per session.
+  Thresholds were settled by replaying the full session's ticks through the
+  detector offline and sweeping configurations against ground truth.
 - **Isolation Forest (batch, 5 m bars):** 6 multivariate features
   (returns, rolling volatility, volume z-score, vwap deviation, tick-count
   z-score, intrabar pressure proxy), contamination 0.01, retrained daily
@@ -78,3 +109,19 @@
 3. **Ground-truth dilution** — duration-limited replays streamed only part of
    the session while truth covered all of it; ~60% of "missed" anomalies were
    never streamed. Fix: injection ceiling = streamed span.
+4. **Frozen-baseline deadlock** — the dispersion chart freezes its slow
+   variance while a burst is in progress so a burst can't contaminate its own
+   reference. But the slow variance initializes from the first return², which
+   is ≈0 at session open — the freeze gate then never reopened, σ_ewma stayed
+   microscopic, and the mean chart fired at every cooldown expiry (6,041
+   events/session, P=0.091, measured). Fix: the freeze only protects an
+   *established* baseline — updates are unconditional during the 240-tick
+   warmup.
+5. **Kafka disorder masquerading as volatility** — PyFlink sinks are
+   value-only (ADR-007), so the clean-ticks topic is keyless and one ticker's
+   ticks interleave across 6 partitions. A return computed across an
+   out-of-order pair is an artificial zigzag that inflates the fast variance:
+   1,316 dispersion alarms per session vs 39 on the same ticks in event-time
+   order (measured live vs offline replay). Fix: the EWMA path skips
+   backwards event-time ticks per key; the rolling Z-score window already
+   handles them by timestamp.

@@ -10,9 +10,12 @@ Design constraints (see docs/decisions.md ADR-003/ADR-007):
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
-from datetime import datetime
+
+# NOTE: datetime.UTC is 3.11+; this module runs on the Flink image's 3.10
+from datetime import datetime, timezone
 
 from pyflink.common import Duration, WatermarkStrategy
 from pyflink.common.serialization import SimpleStringSchema
@@ -69,7 +72,17 @@ def idle_from_argv(default_s: int = IDLENESS_S) -> int:
 
 
 def make_env(parallelism: int = 2) -> StreamExecutionEnvironment:
-    """Stream env with exactly-once checkpointing (matches FLINK_PROPERTIES)."""
+    """Stream env with exactly-once checkpointing (matches FLINK_PROPERTIES).
+
+    --parallelism N (job argv) overrides — lets all three jobs co-exist on a
+    small slot budget for full-ensemble benchmark runs.
+    """
+    import sys
+
+    argv = sys.argv
+    if "--parallelism" in argv:
+        with contextlib.suppress(IndexError, ValueError):
+            parallelism = int(argv[argv.index("--parallelism") + 1])
     env = StreamExecutionEnvironment.get_execution_environment()
     env.set_parallelism(parallelism)
     env.enable_checkpointing(10_000, CheckpointingMode.EXACTLY_ONCE)
@@ -142,9 +155,7 @@ def ts_to_epoch_ms(iso_ts: str) -> int:
 
 
 def epoch_ms_to_iso(ms: int) -> str:
-    from datetime import timezone
-
-    return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc).isoformat()  # noqa: UP017
 
 
 def load_metadata() -> dict[str, dict]:

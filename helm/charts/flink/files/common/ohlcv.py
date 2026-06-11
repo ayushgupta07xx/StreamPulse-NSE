@@ -47,10 +47,15 @@ class OhlcvAggregate(AggregateFunction):
         first = a if (b[0] is None or (a[0] is not None and a[0] <= b[0])) else b
         last = a if (b[4] is None or (a[4] is not None and a[4] >= b[4])) else b
         return [
-            first[0], first[1],
-            max(a[2], b[2]), min(a[3], b[3]),
-            last[4], last[5],
-            a[6] + b[6], a[7] + b[7], a[8] + b[8],
+            first[0],
+            first[1],
+            max(a[2], b[2]),
+            min(a[3], b[3]),
+            last[4],
+            last[5],
+            a[6] + b[6],
+            a[7] + b[7],
+            a[8] + b[8],
         ]
 
 
