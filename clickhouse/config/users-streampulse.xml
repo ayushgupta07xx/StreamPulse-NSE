@@ -1,0 +1,15 @@
+<clickhouse>
+    <users>
+        <!-- Network-facing user for Grafana + ML pipeline. Local demo creds;
+             anything shared must override via secrets (see ADR-004). -->
+        <streampulse>
+            <password>streampulse</password>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <access_management>0</access_management>
+        </streampulse>
+    </users>
+</clickhouse>

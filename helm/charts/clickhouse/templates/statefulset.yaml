@@ -38,10 +38,14 @@ spec:
           volumeMounts:
             - { name: data, mountPath: /var/lib/clickhouse }
             - { name: config, mountPath: /etc/clickhouse-server/config.d }
+            - { name: users, mountPath: /etc/clickhouse-server/users.d }
       volumes:
         - name: config
           configMap:
             name: {{ .Release.Name }}-clickhouse-config
+        - name: users
+          configMap:
+            name: {{ .Release.Name }}-clickhouse-users
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -66,6 +70,23 @@ data:
             <events>true</events>
             <asynchronous_metrics>true</asynchronous_metrics>
         </prometheus>
+    </clickhouse>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-clickhouse-users
+data:
+  streampulse.xml: |
+    <clickhouse>
+        <users>
+            <streampulse>
+                <password>streampulse</password>
+                <networks><ip>::/0</ip></networks>
+                <profile>default</profile>
+                <quota>default</quota>
+            </streampulse>
+        </users>
     </clickhouse>
 ---
 apiVersion: v1

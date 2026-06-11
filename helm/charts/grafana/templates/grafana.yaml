@@ -20,10 +20,10 @@ data:
           host: {{ .Release.Name }}-clickhouse
           port: 9000
           protocol: native
-          username: default
+          username: streampulse
           defaultDatabase: nse
         secureJsonData:
-          password: ""
+          password: streampulse
   dashboards.yml: |
     apiVersion: 1
     providers:

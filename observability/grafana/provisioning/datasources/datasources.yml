@@ -17,7 +17,7 @@ datasources:
       host: clickhouse
       port: 9000
       protocol: native
-      username: default
+      username: streampulse
       defaultDatabase: nse
     secureJsonData:
-      password: ""
+      password: streampulse
