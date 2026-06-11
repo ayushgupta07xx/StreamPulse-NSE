@@ -38,7 +38,8 @@ spec:
           volumeMounts:
             - { name: data, mountPath: /var/lib/clickhouse }
             - { name: config, mountPath: /etc/clickhouse-server/config.d }
-            - { name: users, mountPath: /etc/clickhouse-server/users.d }
+            # subPath: add ONE file without shadowing the image's users.d
+            - { name: users, mountPath: /etc/clickhouse-server/users.d/streampulse.xml, subPath: streampulse.xml }
       volumes:
         - name: config
           configMap:

@@ -1,0 +1,59 @@
+name: Scheduled Isolation Forest retrain
+
+# Nightly CI retrain (§8 Day 9). The production-shaped retrain runs where the
+# data lives (kind CronJob); this workflow proves the training pipeline end to
+# end in CI: ephemeral ClickHouse, bars seeded from the committed historical
+# parquet through the same GBM engine, retrain, MLflow artifacts uploaded.
+
+on:
+  schedule:
+    - cron: "30 19 * * *"   # 01:00 IST nightly
+  workflow_dispatch:
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8
+        ports:
+          - 8123:8123
+        env:
+          CLICKHOUSE_USER: streampulse
+          CLICKHOUSE_PASSWORD: streampulse
+          CLICKHOUSE_DB: nse
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install numpy pandas pyarrow scikit-learn joblib mlflow clickhouse-connect typer tzdata
+      - name: Create schema
+        run: |
+          pip install requests
+          python - <<'EOF'
+          import requests, pathlib, re
+          sql = pathlib.Path("clickhouse/schema.sql").read_text()
+          for stmt in [s.strip() for s in sql.split(";") if s.strip()]:
+              r = requests.post("http://localhost:8123/", params={"user": "streampulse", "password": "streampulse"}, data=stmt)
+              r.raise_for_status()
+          print("schema applied")
+          EOF
+      - name: Seed bars from committed historical data
+        run: python scripts/seed_clickhouse.py --days 8
+        env:
+          PYTHONPATH: apps
+      - name: Retrain
+        run: python -m ml.isolation_forest_retrain retrain --days 8
+        env:
+          PYTHONPATH: apps
+          MLFLOW_TRACKING_URI: file:./mlruns
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolation-forest-${{ github.run_id }}
+          path: |
+            models/isolation_forest_latest.joblib
+            models/isolation_forest_latest.json
+          retention-days: 14

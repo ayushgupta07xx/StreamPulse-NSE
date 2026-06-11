@@ -1,0 +1,50 @@
+# Nightly Isolation Forest retrain where the data lives (§8 Day 9: "GitHub
+# Actions cron OR Kubernetes CronJob if running on kind" — this is the k8s
+# path; the CI workflow proves the same pipeline on ephemeral infrastructure).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-ml-retrain
+spec:
+  schedule: "30 1 * * *"   # 01:30 IST nightly
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: retrain
+              image: streampulse/generator:dev
+              imagePullPolicy: Never
+              command: ["python", "-m", "ml.isolation_forest_retrain", "retrain", "--days", "7"]
+              env:
+                - { name: PYTHONPATH, value: /app }
+                - { name: CLICKHOUSE_HOST, value: "{{ .Release.Name }}-clickhouse" }
+                - { name: CLICKHOUSE_USER, value: streampulse }
+                - { name: CLICKHOUSE_PASSWORD, value: streampulse }
+                - { name: MLFLOW_TRACKING_URI, value: "file:/models/mlruns" }
+                - { name: STREAMPULSE_MODELS_DIR, value: /models }
+              volumeMounts:
+                - { name: models, mountPath: /models }
+              resources:
+                requests: { cpu: 200m, memory: 512Mi }
+                limits: { cpu: "1", memory: 1Gi }
+          volumes:
+            - name: models
+              persistentVolumeClaim:
+                claimName: {{ .Release.Name }}-ml-models
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-ml-models
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 1Gi

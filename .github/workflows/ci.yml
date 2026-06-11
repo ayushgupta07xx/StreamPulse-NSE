@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install linters
+        run: pip install ruff==0.6.9 mypy==1.11.2 sqlfluff==3.1.1 pydantic types-requests
+      - name: ruff
+        run: ruff check apps scripts tests
+      - name: ruff format check
+        run: ruff format --check apps scripts tests
+      - name: mypy
+        run: mypy apps/generator apps/ml scripts --ignore-missing-imports
+      - name: sqlfluff
+        run: sqlfluff lint clickhouse/ --dialect clickhouse
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Sync chart files
+        run: make sync-helm-files PYTHON=python3 || python3 scripts/ci_sync_helm.py
+      - name: Lint all charts
+        run: |
+          helm lint helm/charts/redpanda helm/charts/clickhouse helm/charts/flink \
+            helm/charts/prometheus helm/charts/grafana \
+            helm/charts/streampulse-generator helm/charts/streampulse-flink-jobs
+      - name: Template umbrella
+        run: |
+          helm dependency update helm/charts/streampulse-platform
+          helm template streampulse helm/charts/streampulse-platform > /dev/null
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install deps
+        run: pip install pydantic numpy pandas pyarrow pytest prometheus-client confluent-kafka typer tzdata
+      - name: pytest
+        run: PYTHONPATH=apps pytest tests/unit -q
+
+  terraform-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - name: Validate AWS env
+        working-directory: infra/terraform/envs/local
+        run: |
+          terraform init -backend=false
+          terraform validate
+      - name: Validate GCP module
+        working-directory: infra/terraform/modules/gcp
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build generator image
+        run: docker build -f docker/generator/Dockerfile -t streampulse/generator:ci .
+      - name: Trivy scan (generator)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: streampulse/generator:ci
+          severity: CRITICAL,HIGH
+          exit-code: "0"        # report-only: base-image CVEs tracked, not blocking
+          format: table
+
+  integration-k3d:
+    # full-stack on k3d; main pushes only (CI-minute budget, §22.8)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Install k3d
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+      - name: Create cluster
+        run: k3d cluster create streampulse-ci --agents 1 --wait
+      - name: Build + import images
+        run: |
+          docker build -f docker/flink/Dockerfile -t streampulse/flink:1.18-py docker/flink
+          docker build -f docker/generator/Dockerfile -t streampulse/generator:dev .
+          k3d image import streampulse/flink:1.18-py streampulse/generator:dev -c streampulse-ci
+      - name: Sync chart files + install
+        run: |
+          python3 scripts/ci_sync_helm.py
+          helm dependency update helm/charts/streampulse-platform
+          helm install streampulse helm/charts/streampulse-platform \
+            -f helm/values/values-tiny.yaml --timeout 15m
+      - name: Wait for core pods
+        run: |
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=redpanda --timeout=600s
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=clickhouse --timeout=600s
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=jobmanager --timeout=600s
+      - name: Smoke - ticks flowing
+        run: |
+          sleep 90
+          kubectl exec streampulse-redpanda-0 -- rpk topic consume nse.ticks.raw --num 3 -o start -f '%v\n'
+      - name: Teardown
+        if: always()
+        run: k3d cluster delete streampulse-ci

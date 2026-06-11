@@ -41,12 +41,15 @@ spec:
           resources: {{- toYaml .Values.taskmanager.resources | nindent 12 }}
           readinessProbe:
             tcpSocket: { port: rpc }
-            initialDelaySeconds: 15
+            initialDelaySeconds: 20
             periodSeconds: 10
+            failureThreshold: 12
           livenessProbe:
             tcpSocket: { port: rpc }
-            initialDelaySeconds: 45
-            periodSeconds: 15
+            # generous: JVM cold-start on a shared 4-CPU kind node takes 60-90s
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            failureThreshold: 6
           volumeMounts:
             - { name: checkpoints, mountPath: /opt/flink/checkpoints }
             - { name: jobs, mountPath: /opt/streampulse/flink/jobs }

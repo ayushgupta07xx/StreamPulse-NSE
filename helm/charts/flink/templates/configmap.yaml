@@ -8,6 +8,9 @@ data:
     jobmanager.memory.process.size: 1024m
     taskmanager.numberOfTaskSlots: {{ .Values.taskmanager.slots }}
     taskmanager.memory.process.size: 1536m
+    # pinned (defaults are random) so readiness probes can target them
+    taskmanager.rpc.port: 6122
+    taskmanager.data.port: 6121
     state.backend.type: rocksdb
     state.backend.incremental: true
     state.checkpoints.dir: file:///opt/flink/checkpoints
