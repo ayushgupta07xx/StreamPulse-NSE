@@ -23,3 +23,6 @@ dependencies:
   - name: streampulse-generator
     version: 0.1.0
     repository: file://../streampulse-generator
+  - name: streampulse-flink-jobs
+    version: 0.1.0
+    repository: file://../streampulse-flink-jobs

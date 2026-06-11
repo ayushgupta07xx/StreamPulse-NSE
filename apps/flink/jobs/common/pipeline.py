@@ -38,17 +38,34 @@ OUT_OF_ORDERNESS_S = int(os.environ.get("WATERMARK_OOO_SECONDS", "5"))
 IDLENESS_S = 10
 
 
-def ooo_from_argv(default_s: int = OUT_OF_ORDERNESS_S) -> int:
-    """Read --ooo-seconds N from the job's argv (graph-build time, client side)."""
+def _argv_int(flag: str, default: int) -> int:
+    """Read an integer job argument at graph-build time (client side)."""
     import sys
 
     argv = sys.argv
-    if "--ooo-seconds" in argv:
+    if flag in argv:
         try:
-            return int(argv[argv.index("--ooo-seconds") + 1])
+            return int(argv[argv.index(flag) + 1])
         except (IndexError, ValueError):
             pass
-    return default_s
+    return default
+
+
+def ooo_from_argv(default_s: int = OUT_OF_ORDERNESS_S) -> int:
+    return _argv_int("--ooo-seconds", default_s)
+
+
+def idle_from_argv(default_s: int = IDLENESS_S) -> int:
+    """--idle-seconds N (0 disables idleness).
+
+    Idleness is WALL-clock: a split with no records for N seconds is excluded
+    from the min-watermark. Right for live 1× (thinly-traded stocks must not
+    stall the pipeline) but wrong during accelerated replay/backfill, where
+    fetch-scheduling gaps >N wall-seconds are routine and falsely idle splits
+    — the watermark then leaps ahead and the lagging split's records land
+    late. Pass --idle-seconds 0 for replay verification runs.
+    """
+    return _argv_int("--idle-seconds", default_s)
 
 
 def make_env(parallelism: int = 2) -> StreamExecutionEnvironment:
@@ -95,7 +112,9 @@ def kafka_exactly_once_sink(topic: str, transactional_prefix: str) -> KafkaSink:
     )
 
 
-def record_ts_watermarks(ooo_seconds: int | None = None) -> WatermarkStrategy:
+def record_ts_watermarks(
+    ooo_seconds: int | None = None, idle_seconds: int | None = None
+) -> WatermarkStrategy:
     """Source-level watermarks from KAFKA RECORD TIMESTAMPS (§13 strategy).
 
     Three properties make this the production pattern:
@@ -107,12 +126,15 @@ def record_ts_watermarks(ooo_seconds: int | None = None) -> WatermarkStrategy:
        any cross-partition consumption skew (critical at fast replay speeds).
     3. No Python timestamp assigner: the watermark path stays pure-Java, so
        records don't cross the JVM↔Python bridge before the pipeline starts.
+
+    idle_seconds=0 disables idleness (replay/backfill mode — see idle_from_argv).
     """
     bound = OUT_OF_ORDERNESS_S if ooo_seconds is None else ooo_seconds
-    return (
-        WatermarkStrategy.for_bounded_out_of_orderness(Duration.of_seconds(bound))
-        .with_idleness(Duration.of_seconds(IDLENESS_S))
-    )
+    idle = IDLENESS_S if idle_seconds is None else idle_seconds
+    strategy = WatermarkStrategy.for_bounded_out_of_orderness(Duration.of_seconds(bound))
+    if idle > 0:
+        strategy = strategy.with_idleness(Duration.of_seconds(idle))
+    return strategy
 
 
 def ts_to_epoch_ms(iso_ts: str) -> int:

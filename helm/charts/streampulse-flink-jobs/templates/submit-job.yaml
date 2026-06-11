@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-flink-submit
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 8
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: submit
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              until curl -sf http://{{ .Values.jobmanager }}/overview; do
+                echo waiting for jobmanager; sleep 5
+              done
+              {{- range .Values.jobs }}
+              echo "submitting {{ . }}"
+              flink run -m {{ $.Values.jobmanager }} -d \
+                -py /opt/streampulse/flink/jobs/{{ . }}.py \
+                --pyFiles /opt/streampulse/flink/jobs \
+                {{- if $.Values.oooSeconds }} --ooo-seconds {{ $.Values.oooSeconds }}{{ end }}
+              {{- end }}
+              echo all jobs submitted
+          volumeMounts:
+            - { name: jobs, mountPath: /opt/streampulse/flink/jobs }
+            - { name: jobs-common, mountPath: /opt/streampulse/flink/jobs/common }
+      volumes:
+        - name: jobs
+          configMap:
+            name: {{ .Release.Name }}-flink-jobs-src
+        - name: jobs-common
+          configMap:
+            name: {{ .Release.Name }}-flink-jobs-common

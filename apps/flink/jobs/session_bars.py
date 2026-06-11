@@ -31,6 +31,7 @@ from common.pipeline import (  # noqa: E402
     kafka_exactly_once_sink,
     kafka_json_source,
     make_env,
+    idle_from_argv,
     ooo_from_argv,
     record_ts_watermarks,
 )
@@ -41,7 +42,7 @@ SESSION_GAP_MIN = 5
 def build(env: StreamExecutionEnvironment) -> None:
     source = kafka_json_source("nse.ticks.clean", group_id="flink-session-bars")
     (
-        env.from_source(source, record_ts_watermarks(ooo_from_argv()), "ticks-clean-session")
+        env.from_source(source, record_ts_watermarks(ooo_from_argv(), idle_from_argv()), "ticks-clean-session")
         .map(json.loads)
         .key_by(lambda t: t["ticker"], key_type=Types.STRING())
         .window(EventTimeSessionWindows.with_gap(Time.minutes(SESSION_GAP_MIN)))

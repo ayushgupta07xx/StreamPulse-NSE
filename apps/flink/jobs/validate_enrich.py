@@ -103,6 +103,12 @@ def build(env: StreamExecutionEnvironment) -> None:
         .flat_map(ValidateEnrich(), output_type=Types.STRING())
         .sink_to(sink)
         .name("ticks-clean-sink")
+        # SINGLE producer: two parallel sink subtasks interleave into the same
+        # (unkeyed) partitions with mutual event-time skew, creating
+        # within-partition regressions that break downstream per-split
+        # watermarks. One producer keeps every partition monotonic. At real
+        # scale this becomes a keyed sink instead (ADR-007 / deep-dive doc).
+        .set_parallelism(1)
     )
 
 

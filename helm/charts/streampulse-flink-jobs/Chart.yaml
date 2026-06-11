@@ -1,0 +1,6 @@
+apiVersion: v2
+name: streampulse-flink-jobs
+description: Submits the StreamPulse PyFlink jobs to the session cluster (post-install Job)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

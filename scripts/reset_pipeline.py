@@ -62,7 +62,7 @@ def recreate_topics() -> None:
     print("topics recreated")
 
 
-def submit(job: str, ooo_seconds: int | None) -> None:
+def submit(job: str, ooo_seconds: int | None, idle_seconds: int | None) -> None:
     cmd = JM + [
         "flink", "run",
         "-py", f"/opt/streampulse/flink/jobs/{job}.py",
@@ -71,6 +71,8 @@ def submit(job: str, ooo_seconds: int | None) -> None:
     ]
     if ooo_seconds is not None:
         cmd += ["--ooo-seconds", str(ooo_seconds)]
+    if idle_seconds is not None:
+        cmd += ["--idle-seconds", str(idle_seconds)]
     out = sh(cmd)
     print(out.splitlines()[-1] if out else f"submitted {job}")
 
@@ -78,6 +80,10 @@ def submit(job: str, ooo_seconds: int | None) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--ooo-seconds", type=int, default=None, help="watermark bound for replay speed")
+    ap.add_argument(
+        "--idle-seconds", type=int, default=None,
+        help="idleness detection (0 = disable; use 0 for replay/backfill verification)",
+    )
     ap.add_argument("--jobs", default="validate_enrich,window_bars", help=f"comma list from {ALL_JOBS}")
     args = ap.parse_args()
 
@@ -85,7 +91,7 @@ def main() -> int:
     wipe_topics_and_groups()
     recreate_topics()
     for job in [j.strip() for j in args.jobs.split(",") if j.strip()]:
-        submit(job, args.ooo_seconds)
+        submit(job, args.ooo_seconds, args.idle_seconds)
     print("pipeline reset complete")
     return 0
 

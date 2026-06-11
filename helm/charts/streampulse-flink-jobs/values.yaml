@@ -1,0 +1,14 @@
+image:
+  repository: streampulse/flink
+  tag: 1.18-py
+  pullPolicy: Never
+
+jobmanager: streampulse-flink-jobmanager:8081
+
+jobs:
+  - validate_enrich
+  - window_bars
+  - anomaly_online
+
+# widen watermark bound for fast replays (empty = 5s live default)
+oooSeconds: ""
