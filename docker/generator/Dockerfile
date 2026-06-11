@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir \
     "pandas>=2.2,<3" \
     "pyarrow>=17,<18" \
     "prometheus-client>=0.21,<1" \
-    "typer>=0.12,<1" \
+    "typer>=0.16,<1" \
     "tzdata"
 
 COPY apps/generator /app/generator

@@ -19,7 +19,7 @@
 ## Day checklist
 
 - [x] **Day 1** — repo scaffold, docker-compose stack healthy (9 containers, Flink 2 TM / 8 slots), rpk smoke test passed
-- [ ] **Day 2** — historical pull DONE (50/50 tickers; TATAMOTORS→TMPV, LTIM→TRENT — old symbols dead on Yahoo). Generator code written; needs live run verification ≥1k msg/s *(in progress)*
+- [x] **Day 2** — 50/50 tickers cached (TATAMOTORS→TMPV, LTIM→TRENT — old symbols dead on Yahoo). Generator verified: 495 t/s @10×, **110,424 t/s @max** (criterion ≥1k). 7 topics created per §13. Ground truth JSON written. (typer pinned ^0.16 — 0.12 broke on click 8.3)
 - [ ] Day 3 — Flink validate/enrich, exactly-once + fault-injection test
 - [ ] Day 4 — Flink 1m/5m/15m OHLCV bars + late side-output
 - [ ] Day 5 — ClickHouse schema, Kafka engines, MVs, TTLs

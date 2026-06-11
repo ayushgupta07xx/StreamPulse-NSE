@@ -37,6 +37,11 @@ app = typer.Typer(add_completion=False)
 log = logging.getLogger("generator")
 
 
+@app.callback()
+def _root() -> None:
+    """StreamPulse synthetic tick generator (keeps `run` an explicit subcommand)."""
+
+
 def _load_day(ticker: str, trading_date: str) -> tuple[DayBar, str]:
     df = pd.read_parquet(DATA_DIR / "historical_ohlc" / f"{ticker}.parquet")
     row = df.iloc[-1] if trading_date == "latest" else df[df["date"].astype(str) == trading_date].iloc[0]
