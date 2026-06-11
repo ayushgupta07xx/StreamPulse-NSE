@@ -1,0 +1,13 @@
+# Umbrella defaults. Subchart values live in each chart; override here per env.
+# NOTE: service names below assume the release is installed as "streampulse"
+# (make k8s does this) — they are {{ .Release.Name }}-templated inside charts.
+
+flink:
+  kafkaBootstrap: streampulse-redpanda:9092
+
+clickhouse:
+  kafkaBroker: streampulse-redpanda:9092
+
+streampulse-generator:
+  kafkaBootstrap: streampulse-redpanda:9092
+  speed: "10"

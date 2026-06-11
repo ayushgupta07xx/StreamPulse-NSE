@@ -1,0 +1,20 @@
+# Resource-constrained profile (8 GB laptops / CI): single TM, smaller everything.
+flink:
+  taskmanager:
+    replicas: 1
+    hpa:
+      enabled: false
+    resources:
+      requests: { cpu: 250m, memory: 1Gi }
+      limits: { cpu: "1", memory: 1280Mi }
+
+redpanda:
+  memory: 768M
+  resources:
+    requests: { cpu: 250m, memory: 768Mi }
+    limits: { cpu: 500m, memory: 1Gi }
+
+clickhouse:
+  resources:
+    requests: { cpu: 200m, memory: 512Mi }
+    limits: { cpu: 500m, memory: 1Gi }

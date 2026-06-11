@@ -1,0 +1,169 @@
+{
+  "title": "Market Overview",
+  "uid": "sp-market-overview",
+  "tags": ["streampulse", "business"],
+  "timezone": "Asia/Kolkata",
+  "refresh": "500ms",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "ticker",
+        "label": "Ticker",
+        "type": "query",
+        "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "query": "SELECT DISTINCT ticker FROM nse.ticks_clean ORDER BY ticker",
+        "current": { "text": "TCS", "value": "TCS" },
+        "refresh": 2,
+        "sort": 1
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Anomalies",
+        "enable": true,
+        "iconColor": "red",
+        "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+        "target": {
+          "rawSql": "SELECT toUnixTimestamp64Milli(ts) AS time, concat(detection_method, ' ', toString(round(score,1)), 'σ') AS text, detection_method AS tags FROM nse.anomalies WHERE ticker = '$ticker' AND $__timeFilter(ts)",
+          "editorType": "sql",
+          "format": 3
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "$ticker — live price",
+      "gridPos": { "h": 11, "w": 16, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 8, "spanNulls": true },
+          "unit": "currencyINR",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "rawSql": "SELECT toStartOfSecond(timestamp_ist) AS time, avg(price) AS price FROM nse.ticks_clean WHERE ticker = '$ticker' AND $__timeFilter(timestamp_ist) GROUP BY time ORDER BY time"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Last price",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "unit": "currencyINR", "decimals": 2 }, "overrides": [] },
+      "options": { "graphMode": "area", "colorMode": "value" },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "rawSql": "SELECT timestamp_ist AS time, price FROM nse.ticks_clean WHERE ticker = '$ticker' ORDER BY timestamp_ist DESC LIMIT 1"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Anomalies (30m, $ticker)",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 4 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background" },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "rawSql": "SELECT count() FROM nse.anomalies WHERE ticker = '$ticker' AND ts >= now() - INTERVAL 30 MINUTE"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "barchart",
+      "title": "$ticker — volume (1m bars)",
+      "gridPos": { "h": 7, "w": 16, "x": 0, "y": 11 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "showValue": "never", "xTickLabelRotation": -45 },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 1,
+          "rawSql": "SELECT window_start AS time, max(volume) AS volume FROM nse.bars FINAL WHERE bar_size='1m' AND ticker='$ticker' AND $__timeFilter(window_start) GROUP BY time ORDER BY time"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Top movers (last 15m vs prior 15m)",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "decimals": 2 },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "move_pct" },
+            "properties": [ { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+                            { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 0 } ] } } ] }
+        ]
+      },
+      "options": { "sortBy": [ { "displayName": "move_pct", "desc": true } ] },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 2,
+          "rawSql": "WITH latest AS (SELECT ticker, argMax(close, window_start) AS last_close, argMin(open, window_start) AS first_open FROM nse.bars FINAL WHERE bar_size='1m' AND window_start >= now() - INTERVAL 15 MINUTE GROUP BY ticker) SELECT ticker, round((last_close - first_open) / first_open * 100, 2) AS move_pct FROM latest ORDER BY abs(move_pct) DESC LIMIT 10"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Sector pulse (15m)",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 18 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": {
+        "defaults": { "decimals": 2 },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "avg_move_pct" },
+            "properties": [ { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+                            { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": -0.05 }, { "color": "green", "value": 0.05 } ] } },
+                            { "id": "unit", "value": "percent" } ] }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorType": "sql",
+          "format": 2,
+          "rawSql": "SELECT t.sector AS sector, count(DISTINCT b.ticker) AS stocks, round(avg((b.close - b.open) / b.open * 100), 3) AS avg_move_pct, sum(b.volume) AS total_volume FROM nse.bars b FINAL INNER JOIN (SELECT DISTINCT ticker, sector FROM nse.ticks_clean) t ON b.ticker = t.ticker WHERE b.bar_size='15m' AND b.window_start >= now() - INTERVAL 30 MINUTE GROUP BY t.sector ORDER BY avg_move_pct DESC"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

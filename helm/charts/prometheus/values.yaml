@@ -1,0 +1,9 @@
+image:
+  repository: prom/prometheus
+  tag: v2.53.2
+
+retention: 7d
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { cpu: 500m, memory: 512Mi }

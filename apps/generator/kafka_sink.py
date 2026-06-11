@@ -75,12 +75,16 @@ class TickSink:
             metrics.MESSAGES_PRODUCED.labels(ticker=msg.key().decode()).inc()
 
     def send(self, tick: Tick) -> None:
+        # Kafka record timestamp = event time. Downstream Flink jobs watermark
+        # off record timestamps natively (pure-Java path, no Python assigner).
+        event_ms = int(tick.timestamp_ist.timestamp() * 1000)
         while True:
             try:
                 self._producer.produce(
                     self.topic,
                     key=tick.ticker.encode(),
                     value=tick.to_json_bytes(),
+                    timestamp=event_ms,
                     on_delivery=self._on_delivery,
                 )
                 break

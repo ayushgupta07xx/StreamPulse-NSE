@@ -1,0 +1,6 @@
+apiVersion: v2
+name: flink
+description: Flink 1.18 session cluster (JM + scalable TMs) with PyFlink image for StreamPulse
+type: application
+version: 0.1.0
+appVersion: "1.18.1"

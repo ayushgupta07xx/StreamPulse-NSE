@@ -30,7 +30,7 @@ import math
 import sys
 from collections import deque
 
-from pyflink.common import Types, WatermarkStrategy
+from pyflink.common import Types
 from pyflink.common.typeinfo import Types as T
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.functions import KeyedProcessFunction, RuntimeContext
@@ -44,7 +44,7 @@ from common.pipeline import (  # noqa: E402
     kafka_json_source,
     make_env,
     ooo_from_argv,
-    tick_watermarks,
+    record_ts_watermarks,
     ts_to_epoch_ms,
 )
 
@@ -172,9 +172,8 @@ class OnlineDetectors(KeyedProcessFunction):
 def build(env: StreamExecutionEnvironment) -> None:
     source = kafka_json_source("nse.ticks.clean", group_id="flink-anomaly-online")
     (
-        env.from_source(source, WatermarkStrategy.no_watermarks(), "ticks-clean-anomaly")
+        env.from_source(source, record_ts_watermarks(ooo_from_argv()), "ticks-clean-anomaly")
         .map(json.loads)
-        .assign_timestamps_and_watermarks(tick_watermarks(ooo_from_argv()))
         .key_by(lambda t: t["ticker"], key_type=T.STRING())
         .process(OnlineDetectors(), output_type=T.STRING())
         .sink_to(kafka_exactly_once_sink("nse.anomalies", "anomaly-online"))

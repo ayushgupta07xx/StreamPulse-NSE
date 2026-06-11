@@ -25,6 +25,19 @@ smoke:
 	docker exec streampulse-redpanda rpk topic consume smoke-test --num 1 --offset start
 	docker exec streampulse-redpanda rpk topic delete smoke-test
 
+# Submit all Flink jobs (detached). OOO=<seconds> widens watermarks for fast replays.
+flink-jobs:
+	docker exec streampulse-flink-jm flink run -py /opt/streampulse/flink/jobs/validate_enrich.py --pyFiles /opt/streampulse/flink/jobs -d
+	docker exec streampulse-flink-jm flink run -py /opt/streampulse/flink/jobs/window_bars.py --pyFiles /opt/streampulse/flink/jobs -d $(if $(OOO),--ooo-seconds $(OOO),)
+	docker exec streampulse-flink-jm flink run -py /opt/streampulse/flink/jobs/anomaly_online.py --pyFiles /opt/streampulse/flink/jobs -d $(if $(OOO),--ooo-seconds $(OOO),)
+
+# Full event-time reset: cancel jobs, wipe topics+groups, resubmit
+reset:
+	.venv/Scripts/python.exe scripts/reset_pipeline.py $(if $(OOO),--ooo-seconds $(OOO),)
+
+verify-bars:
+	.venv/Scripts/python.exe scripts/verify_bars.py
+
 # Placeholders — implemented on later build days
 demo:
 	@echo "make demo lands on Day 14 (scripts/inject_demo_anomalies.py)"
@@ -32,5 +45,25 @@ demo:
 benchmark:
 	@echo "make benchmark lands on Day 10 (tests/benchmarks)"
 
-k8s:
-	@echo "make k8s lands on Day 7 (kind + Helm umbrella chart)"
+# Copy SQL / job sources / dashboards / reference data into chart files/ dirs
+# (charts must be self-contained for helm package + .Files access)
+sync-helm-files:
+	python -c "import shutil, pathlib; \
+	[shutil.copytree(s, d, dirs_exist_ok=True) if pathlib.Path(s).is_dir() else shutil.copy2(s, d) for s, d in [ \
+	('clickhouse', 'helm/charts/clickhouse/files'), \
+	('apps/flink/jobs', 'helm/charts/flink/files/jobs'), \
+	('observability/grafana/dashboards', 'helm/charts/grafana/files/dashboards'), \
+	('data', 'helm/charts/streampulse-generator/files/data')]]"
+	python -c "import shutil; shutil.copytree('apps/flink/jobs/common', 'helm/charts/flink/files/common', dirs_exist_ok=True); shutil.rmtree('helm/charts/flink/files/jobs/common', ignore_errors=True)"
+	python -c "import shutil; shutil.rmtree('helm/charts/clickhouse/files/init', ignore_errors=True); shutil.rmtree('helm/charts/clickhouse/files/config', ignore_errors=True)"
+
+# kind cluster + umbrella install (Day 7)
+k8s: sync-helm-files
+	-kind create cluster --name streampulse --config helm/kind-cluster.yaml
+	kind load docker-image streampulse/flink:1.18-py --name streampulse
+	kind load docker-image streampulse/generator:dev --name streampulse
+	helm dependency update helm/charts/streampulse-platform
+	helm upgrade --install streampulse helm/charts/streampulse-platform --wait --timeout 10m
+
+k8s-down:
+	kind delete cluster --name streampulse

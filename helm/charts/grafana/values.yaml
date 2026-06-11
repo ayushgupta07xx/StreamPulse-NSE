@@ -1,0 +1,12 @@
+image:
+  repository: grafana/grafana
+  tag: 11.2.2
+
+adminUser: admin
+adminPassword: admin   # local demo only — override via --set or a Secret for anything shared
+
+plugins: grafana-clickhouse-datasource
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { cpu: 500m, memory: 512Mi }

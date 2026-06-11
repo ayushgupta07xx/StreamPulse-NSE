@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-redpanda
+  labels:
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - { name: kafka, port: {{ .Values.service.kafkaPort }}, targetPort: kafka }
+    - { name: admin, port: {{ .Values.service.adminPort }}, targetPort: admin }
+    - { name: registry, port: {{ .Values.service.schemaRegistryPort }}, targetPort: registry }
+    - { name: proxy, port: {{ .Values.service.pandaproxyPort }}, targetPort: proxy }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-redpanda-headless
+  labels:
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: redpanda
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - { name: rpc, port: 33145 }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-redpanda
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-redpanda
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redpanda
+      app.kubernetes.io/instance: {{ .Release.Name }}

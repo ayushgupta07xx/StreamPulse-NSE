@@ -1,0 +1,27 @@
+image:
+  repository: redpandadata/redpanda
+  tag: v24.2.18
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "1"
+    memory: 1536Mi
+
+# redpanda --smp / --memory passed to the binary (keep <= resources.limits)
+smp: 1
+memory: 1G
+
+storage:
+  size: 5Gi
+  storageClassName: standard   # kind default provisioner
+
+service:
+  kafkaPort: 9092
+  adminPort: 9644
+  schemaRegistryPort: 8081
+  pandaproxyPort: 8082

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: redpanda
+description: Single-node Redpanda (Kafka API) for StreamPulse — KRaft-free, schema registry built in
+type: application
+version: 0.1.0
+appVersion: "24.2.18"

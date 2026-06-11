@@ -36,6 +36,8 @@ from common.pipeline import (  # noqa: E402
     kafka_json_source,
     load_metadata,
     make_env,
+    ooo_from_argv,
+    record_ts_watermarks,
 )
 
 REQUIRED_FIELDS = ("ticker", "timestamp_ist", "price", "volume", "side", "session_id", "seq")
@@ -91,10 +93,11 @@ def build(env: StreamExecutionEnvironment) -> None:
     source = kafka_json_source("nse.ticks.raw", group_id="flink-validate-enrich")
     sink = kafka_exactly_once_sink("nse.ticks.clean", transactional_prefix="validate-enrich")
 
-    from pyflink.common import WatermarkStrategy
-
     (
-        env.from_source(source, WatermarkStrategy.no_watermarks(), "ticks-raw")
+        # record-timestamp watermarks: element timestamps flow through the
+        # chain and the KafkaSink stamps them onto nse.ticks.clean records,
+        # so downstream jobs inherit event time without parsing payloads
+        env.from_source(source, record_ts_watermarks(ooo_from_argv()), "ticks-raw")
         # output_type is load-bearing: the Java Kafka sink needs Java Strings,
         # not pickled Python bytes (ADR-007)
         .flat_map(ValidateEnrich(), output_type=Types.STRING())

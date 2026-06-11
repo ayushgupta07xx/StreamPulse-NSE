@@ -1,0 +1,25 @@
+apiVersion: v2
+name: streampulse-platform
+description: StreamPulse NSE umbrella — Redpanda, Flink, ClickHouse, Prometheus, Grafana, generator
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: redpanda
+    version: 0.1.0
+    repository: file://../redpanda
+  - name: clickhouse
+    version: 0.1.0
+    repository: file://../clickhouse
+  - name: flink
+    version: 0.1.0
+    repository: file://../flink
+  - name: prometheus
+    version: 0.1.0
+    repository: file://../prometheus
+  - name: grafana
+    version: 0.1.0
+    repository: file://../grafana
+  - name: streampulse-generator
+    version: 0.1.0
+    repository: file://../streampulse-generator

@@ -1,0 +1,29 @@
+# Custom image (flink 1.18 + Python 3.10 + PyFlink + Kafka connector).
+# Build locally and load into kind:  kind load docker-image streampulse/flink:1.18-py
+image:
+  repository: streampulse/flink
+  tag: 1.18-py
+  pullPolicy: Never   # kind-loaded image; never pull from a registry
+
+jobmanager:
+  resources:
+    requests: { cpu: 250m, memory: 1Gi }
+    limits: { cpu: "1", memory: 1280Mi }
+
+taskmanager:
+  replicas: 2
+  slots: 4
+  resources:
+    requests: { cpu: 500m, memory: 1536Mi }
+    limits: { cpu: "2", memory: 1792Mi }
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 75
+
+kafkaBootstrap: streampulse-redpanda:9092
+
+checkpointing:
+  intervalMs: 10000
+  mode: EXACTLY_ONCE

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-flink-conf
+data:
+  FLINK_PROPERTIES: |
+    jobmanager.rpc.address: {{ .Release.Name }}-flink-jobmanager
+    jobmanager.memory.process.size: 1024m
+    taskmanager.numberOfTaskSlots: {{ .Values.taskmanager.slots }}
+    taskmanager.memory.process.size: 1536m
+    state.backend.type: rocksdb
+    state.backend.incremental: true
+    state.checkpoints.dir: file:///opt/flink/checkpoints
+    execution.checkpointing.interval: {{ .Values.checkpointing.intervalMs }}ms
+    execution.checkpointing.mode: {{ .Values.checkpointing.mode }}
+    execution.checkpointing.timeout: 2min
+    metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+    metrics.reporter.prom.port: 9249

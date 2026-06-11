@@ -94,7 +94,8 @@ services:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 4
-        taskmanager.memory.process.size: 1536m
+        taskmanager.memory.process.size: 1408m
+        taskmanager.memory.jvm-overhead.max: 192m
         state.backend.type: rocksdb
         state.backend.incremental: true
         state.checkpoints.dir: file:///opt/flink/checkpoints

@@ -1,0 +1,8 @@
+# kind cluster: 1 control plane + 2 workers (§8 Day 7)
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: streampulse
+nodes:
+  - role: control-plane
+  - role: worker
+  - role: worker

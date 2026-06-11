@@ -1,0 +1,46 @@
+# Applies schema.sql + materialized_views.sql + ttl_policies.sql after the
+# server is ready. SQL ships in the chart's files/ dir (synced from
+# clickhouse/ by `make sync-helm-files`); the Kafka broker address is
+# templated for the k8s service name.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-clickhouse-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              until clickhouse-client --host {{ .Release.Name }}-clickhouse --query 'SELECT 1' >/dev/null 2>&1; do
+                echo waiting for clickhouse; sleep 3
+              done
+              for f in /sql/schema.sql /sql/materialized_views.sql /sql/ttl_policies.sql; do
+                echo applying $f
+                sed 's/redpanda:9092/{{ .Values.kafkaBroker }}/g' $f | \
+                  clickhouse-client --host {{ .Release.Name }}-clickhouse --multiquery
+              done
+              echo init complete
+          volumeMounts:
+            - { name: sql, mountPath: /sql }
+      volumes:
+        - name: sql
+          configMap:
+            name: {{ .Release.Name }}-clickhouse-sql
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-clickhouse-sql
+data:
+{{ (.Files.Glob "files/*.sql").AsConfig | indent 2 }}

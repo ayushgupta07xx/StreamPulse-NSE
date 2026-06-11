@@ -16,7 +16,6 @@ from datetime import datetime
 
 from pyflink.common import Duration, WatermarkStrategy
 from pyflink.common.serialization import SimpleStringSchema
-from pyflink.common.watermark_strategy import TimestampAssigner
 from pyflink.datastream import CheckpointingMode, StreamExecutionEnvironment
 from pyflink.datastream.connectors.kafka import (
     DeliveryGuarantee,
@@ -96,20 +95,23 @@ def kafka_exactly_once_sink(topic: str, transactional_prefix: str) -> KafkaSink:
     )
 
 
-class TickTimestampAssigner(TimestampAssigner):
-    """Event time = the tick's own timestamp_ist (epoch millis)."""
+def record_ts_watermarks(ooo_seconds: int | None = None) -> WatermarkStrategy:
+    """Source-level watermarks from KAFKA RECORD TIMESTAMPS (§13 strategy).
 
-    def extract_timestamp(self, value: dict, record_timestamp: int) -> int:
-        return ts_to_epoch_ms(value["timestamp_ist"])
-
-
-def tick_watermarks(ooo_seconds: int | None = None) -> WatermarkStrategy:
-    """Bounded out-of-orderness (default 5 s) + idle-source detection 10 s (§13)."""
+    Three properties make this the production pattern:
+    1. The generator stamps record timestamp = event time at produce, and
+       Flink's KafkaSink propagates element timestamps to produced records —
+       so event time survives every hop without touching payload JSON.
+    2. Watermarking at the source keeps per-split (per-partition) watermark
+       tracking: the operator watermark is min across partitions, absorbing
+       any cross-partition consumption skew (critical at fast replay speeds).
+    3. No Python timestamp assigner: the watermark path stays pure-Java, so
+       records don't cross the JVM↔Python bridge before the pipeline starts.
+    """
     bound = OUT_OF_ORDERNESS_S if ooo_seconds is None else ooo_seconds
     return (
         WatermarkStrategy.for_bounded_out_of_orderness(Duration.of_seconds(bound))
         .with_idleness(Duration.of_seconds(IDLENESS_S))
-        .with_timestamp_assigner(TickTimestampAssigner())
     )
 
 

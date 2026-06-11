@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-generator
+  labels:
+    app.kubernetes.io/name: generator
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: generator
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: generator
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}-generator
+      containers:
+        - name: generator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --speed={{ .Values.speed }}
+            - --anomalies={{ .Values.anomalies }}
+            - --seed={{ .Values.seed }}
+            - --ground-truth-out=/tmp/anomaly_ground_truth.json
+          env:
+            - { name: KAFKA_BOOTSTRAP, value: {{ .Values.kafkaBootstrap | quote }} }
+            - { name: TICKERS, value: {{ .Values.tickers | quote }} }
+            - { name: STREAMPULSE_DATA_DIR, value: /data }
+          ports:
+            - { name: metrics, containerPort: 8000 }
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet: { path: /metrics, port: metrics }
+            initialDelaySeconds: 10
+          volumeMounts:
+            - { name: refdata, mountPath: /data }
+            - { name: ohlc, mountPath: /data/historical_ohlc }
+      volumes:
+        - name: refdata
+          configMap:
+            name: {{ .Release.Name }}-generator-refdata
+        - name: ohlc
+          configMap:
+            name: {{ .Release.Name }}-generator-ohlc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-generator
+spec:
+  selector:
+    app.kubernetes.io/name: generator
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - { name: metrics, port: 8000 }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-generator
+---
+# Reference data: metadata CSV + per-ticker OHLC parquet (binary) shipped in
+# the chart. Parquet files are binaryData entries.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-generator-refdata
+data:
+{{ (.Files.Glob "files/data/*.csv").AsConfig | indent 2 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-generator-ohlc
+binaryData:
+{{- range $path, $_ := .Files.Glob "files/data/historical_ohlc/*.parquet" }}
+  {{ base $path }}: |-
+{{ $.Files.Get $path | b64enc | indent 4 }}
+{{- end }}

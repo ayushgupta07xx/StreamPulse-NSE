@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import sys
 
-from pyflink.common import Types, WatermarkStrategy
+from pyflink.common import Types
 from pyflink.common.time import Time
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.window import EventTimeSessionWindows
@@ -32,7 +32,7 @@ from common.pipeline import (  # noqa: E402
     kafka_json_source,
     make_env,
     ooo_from_argv,
-    tick_watermarks,
+    record_ts_watermarks,
 )
 
 SESSION_GAP_MIN = 5
@@ -41,9 +41,8 @@ SESSION_GAP_MIN = 5
 def build(env: StreamExecutionEnvironment) -> None:
     source = kafka_json_source("nse.ticks.clean", group_id="flink-session-bars")
     (
-        env.from_source(source, WatermarkStrategy.no_watermarks(), "ticks-clean-session")
+        env.from_source(source, record_ts_watermarks(ooo_from_argv()), "ticks-clean-session")
         .map(json.loads)
-        .assign_timestamps_and_watermarks(tick_watermarks(ooo_from_argv()))
         .key_by(lambda t: t["ticker"], key_type=Types.STRING())
         .window(EventTimeSessionWindows.with_gap(Time.minutes(SESSION_GAP_MIN)))
         .aggregate(OhlcvAggregate(), window_function=AttachWindowMeta("session"))

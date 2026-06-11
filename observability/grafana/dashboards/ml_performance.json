@@ -1,0 +1,79 @@
+{
+  "title": "ML Performance",
+  "uid": "sp-ml-performance",
+  "tags": ["streampulse", "ml"],
+  "timezone": "Asia/Kolkata",
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Model versions in production (scored bars per version)",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "targets": [
+        { "refId": "A", "editorType": "sql", "format": 2,
+          "rawSql": "SELECT model_version, count() AS scored, sum(is_anomaly) AS flagged, round(avg(anomaly_score), 4) AS avg_score, min(_ingested_at) AS first_seen, max(_ingested_at) AS last_seen FROM nse.anomalies_ml WHERE $__timeFilter(window_start) GROUP BY model_version ORDER BY last_seen DESC" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Isolation Forest flag rate",
+      "description": "Flags / scored bars per 15m — drift indicator (baseline = contamination 1%)",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "custom": { "fillOpacity": 15 },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 0.05 }, { "color": "red", "value": 0.15 } ] } },
+        "overrides": []
+      },
+      "targets": [
+        { "refId": "A", "editorType": "sql", "format": 1,
+          "rawSql": "SELECT toStartOfFifteenMinutes(window_start) AS time, sum(is_anomaly) / count() AS flag_rate FROM nse.anomalies_ml WHERE $__timeFilter(window_start) GROUP BY time ORDER BY time" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Anomaly score distribution over time (p1 / p50 / p99)",
+      "description": "Downward drift of p50 suggests feature distribution shift → retrain",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 5 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "editorType": "sql", "format": 1,
+          "rawSql": "SELECT toStartOfFifteenMinutes(window_start) AS time, quantile(0.01)(anomaly_score) AS p01, quantile(0.5)(anomaly_score) AS p50, quantile(0.99)(anomaly_score) AS p99 FROM nse.anomalies_ml WHERE $__timeFilter(window_start) GROUP BY time ORDER BY time" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Detections per method per hour (ensemble inputs)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "stacking": { "mode": "normal" }, "fillOpacity": 60 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "editorType": "sql", "format": 1,
+          "rawSql": "SELECT toStartOfHour(ts) AS time, detection_method, count() AS fired FROM nse.anomalies WHERE $__timeFilter(ts) GROUP BY time, detection_method ORDER BY time" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Latest flagged bars (Isolation Forest) with feature vectors",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 15 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "sortBy": [ { "displayName": "window_start", "desc": true } ] },
+      "targets": [
+        { "refId": "A", "editorType": "sql", "format": 2,
+          "rawSql": "SELECT window_start, ticker, model_version, round(anomaly_score, 4) AS score, features FROM nse.anomalies_ml WHERE is_anomaly = 1 AND $__timeFilter(window_start) ORDER BY window_start DESC LIMIT 50" }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

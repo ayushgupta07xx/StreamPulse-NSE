@@ -1,29 +1,78 @@
 groups:
-  - name: streampulse-pipeline
+  - name: streampulse-availability
     rules:
       - alert: RedpandaDown
         expr: up{job="redpanda"} == 0
         for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Redpanda broker is down"
+        labels: {severity: critical}
+        annotations: {summary: "Redpanda broker is down"}
 
       - alert: FlinkJobManagerDown
         expr: up{job="flink-jobmanager"} == 0
         for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Flink JobManager is down"
+        labels: {severity: critical}
+        annotations: {summary: "Flink JobManager is down"}
 
       - alert: ClickHouseDown
         expr: up{job="clickhouse"} == 0
         for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "ClickHouse is down"
+        labels: {severity: critical}
+        annotations: {summary: "ClickHouse is down"}
 
-      # Full rule set (lag, checkpoint failures, latency p99, generator stall)
-      # lands on Day 6 with real metric names verified against live scrape data.
+  - name: streampulse-pipeline
+    rules:
+      # §16: consumer group lag > 10K for 2 min
+      - alert: KafkaConsumerLagHigh
+        expr: sum by (redpanda_group) (redpanda_kafka_consumer_group_lag_sum) > 10000
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "Consumer group {{ $labels.redpanda_group }} lag > 10K for 2m"
+
+      # §16: any Flink checkpoint failure pages
+      - alert: FlinkCheckpointFailure
+        expr: increase(flink_jobmanager_job_numberOfFailedCheckpoints[5m]) > 0
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: "Flink job {{ $labels.job_name }} failed a checkpoint"
+
+      - alert: FlinkJobRestarting
+        expr: increase(flink_jobmanager_job_numRestarts[10m]) > 2
+        for: 0m
+        labels: {severity: warning}
+        annotations:
+          summary: "Flink job {{ $labels.job_name }} restarted >2 times in 10m"
+
+      # §16: generator stopped producing for 30 sec
+      - alert: GeneratorStalled
+        expr: rate(generator_messages_produced_total[1m]) == 0 and up{job="generator"} == 1
+        for: 30s
+        labels: {severity: warning}
+        annotations: {summary: "Tick generator stopped producing for 30s"}
+
+      # §16: anomaly rate jumped >10x baseline for 5 min
+      - alert: AnomalyRateSpike
+        expr: >
+          sum(rate(generator_anomalies_injected_total[5m])) == 0
+          and sum(increase(flink_taskmanager_job_task_operator_ticks_rejected[5m])) > 1000
+        for: 5m
+        labels: {severity: info}
+        annotations:
+          summary: "Validation reject rate spiked without injected anomalies — possible pipeline bug"
+
+  - name: streampulse-latency
+    rules:
+      # §16: ClickHouse query p99 > 1s for 5 min
+      - alert: ClickHouseSlowQueries
+        expr: ClickHouseProfileEvents_QueryTimeMicroseconds / on() group_left ClickHouseProfileEvents_Query > 1000000
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "ClickHouse mean query time > 1s over 5m"}
+
+      - alert: FlinkCheckpointSlow
+        expr: flink_jobmanager_job_lastCheckpointDuration > 30000
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Flink checkpoints taking >30s (job {{ $labels.job_name }})"

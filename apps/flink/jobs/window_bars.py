@@ -36,7 +36,7 @@ from common.pipeline import (  # noqa: E402
     kafka_json_source,
     make_env,
     ooo_from_argv,
-    tick_watermarks,
+    record_ts_watermarks,
 )
 
 ALLOWED_LATENESS_S = 30
@@ -50,12 +50,12 @@ WINDOWS = {
 
 def build(env: StreamExecutionEnvironment) -> None:
     source = kafka_json_source("nse.ticks.clean", group_id="flink-window-bars")
-    from pyflink.common import WatermarkStrategy
 
+    # Watermarks AT the source from Kafka record timestamps: per-partition
+    # tracking absorbs consumption skew, zero Python in the watermark path
     parsed = (
-        env.from_source(source, WatermarkStrategy.no_watermarks(), "ticks-clean")
+        env.from_source(source, record_ts_watermarks(ooo_from_argv()), "ticks-clean")
         .map(json.loads)
-        .assign_timestamps_and_watermarks(tick_watermarks(ooo_from_argv()))
     )
     keyed = parsed.key_by(lambda t: t["ticker"], key_type=Types.STRING())
 

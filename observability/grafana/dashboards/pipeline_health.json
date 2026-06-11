@@ -1,0 +1,137 @@
+{
+  "title": "Pipeline Health",
+  "uid": "sp-pipeline-health",
+  "tags": ["streampulse", "ops"],
+  "timezone": "Asia/Kolkata",
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Generator throughput (ticks/s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 15 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(generator_messages_produced_total[30s]))", "legendFormat": "produced/s" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Kafka consumer group lag",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum by (redpanda_group) (redpanda_kafka_consumer_group_lag_sum)", "legendFormat": "{{redpanda_group}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Flink checkpoint duration",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "flink_jobmanager_job_lastCheckpointDuration", "legendFormat": "{{job_name}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Failed checkpoints (1h)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } },
+        "overrides": []
+      },
+      "options": { "colorMode": "background" },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(flink_jobmanager_job_numberOfFailedCheckpoints[1h]))" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Flink job restarts (1h)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 3 } ] } },
+        "overrides": []
+      },
+      "options": { "colorMode": "background" },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(flink_jobmanager_job_numRestarts[1h]))" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Validation: accepted vs rejected (ticks/s)",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(flink_taskmanager_job_task_operator_ticks_accepted[1m]))", "legendFormat": "accepted/s" },
+        { "refId": "B", "expr": "sum(rate(flink_taskmanager_job_task_operator_ticks_rejected[1m]))", "legendFormat": "rejected/s" }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "ClickHouse: rows ingested /s",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "rate(ClickHouseProfileEvents_InsertedRows[1m])", "legendFormat": "inserted rows/s" }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "ClickHouse: query latency (avg, ms)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "targets": [
+        { "refId": "A",
+          "expr": "rate(ClickHouseProfileEvents_QueryTimeMicroseconds[1m]) / 1000 / clamp_min(rate(ClickHouseProfileEvents_Query[1m]), 0.001)",
+          "legendFormat": "mean query ms" }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "End-to-end freshness: newest tick age in ClickHouse (s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 10 } ] } },
+        "overrides": []
+      },
+      "targets": [
+        { "refId": "A", "editorType": "sql", "format": 1,
+          "rawSql": "SELECT now() AS time, dateDiff('second', max(_ingested_at), now()) AS staleness_s FROM nse.ticks_clean WHERE _ingested_at >= now() - INTERVAL 10 MINUTE" }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "TaskManager JVM heap used",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "flink_taskmanager_Status_JVM_Memory_Heap_Used", "legendFormat": "{{tm_id}}" }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

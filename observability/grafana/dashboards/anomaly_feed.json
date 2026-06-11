@@ -1,0 +1,109 @@
+{
+  "title": "Anomaly Feed",
+  "uid": "sp-anomaly-feed",
+  "tags": ["streampulse", "business"],
+  "timezone": "Asia/Kolkata",
+  "refresh": "500ms",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "ANOMALY STATUS",
+      "description": "Red when any anomaly fired in the last 60s",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "CLEAR", "color": "green" } } },
+            { "type": "range", "options": { "from": 1, "to": 100000, "result": { "text": "ANOMALY DETECTED", "color": "red" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "targets": [
+        { "refId": "A", "editorType": "sql", "format": 1,
+          "rawSql": "SELECT count() FROM nse.anomalies WHERE ts >= now() - INTERVAL 60 SECOND" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Per-method counts (30m)",
+      "gridPos": { "h": 5, "w": 12, "x": 6, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "value_and_name" },
+      "targets": [
+        { "refId": "A", "editorType": "sql", "format": 2,
+          "rawSql": "SELECT detection_method, count() AS fired FROM nse.anomalies WHERE ts >= now() - INTERVAL 30 MINUTE GROUP BY detection_method ORDER BY fired DESC" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Max ensemble severity (5m)",
+      "description": "Methods agreeing on the same ticker within a 30s bucket",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 2 }, { "color": "red", "value": 3 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background" },
+      "targets": [
+        { "refId": "A", "editorType": "sql", "format": 1,
+          "rawSql": "SELECT max(sev) FROM (SELECT ticker, toStartOfInterval(ts, INTERVAL 30 SECOND) AS bucket, uniqExact(detection_method) AS sev FROM nse.anomalies WHERE ts >= now() - INTERVAL 5 MINUTE GROUP BY ticker, bucket)" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Live anomaly feed",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 5 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "severity" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              { "id": "mappings", "value": [
+                { "type": "value", "options": { "1": { "text": "● low", "color": "green" }, "2": { "text": "●● corroborated", "color": "yellow" }, "3": { "text": "●●● strong", "color": "red" }, "4": { "text": "●●●● max", "color": "dark-red" } } }
+              ] }
+            ] },
+          { "matcher": { "id": "byName", "options": "score" },
+            "properties": [ { "id": "decimals", "value": 2 }, { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+                            { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "text", "value": null }, { "color": "orange", "value": 3.5 }, { "color": "red", "value": 5 } ] } } ] }
+        ]
+      },
+      "options": { "sortBy": [ { "displayName": "ts", "desc": true } ] },
+      "targets": [
+        { "refId": "A", "editorType": "sql", "format": 2,
+          "rawSql": "WITH ens AS (SELECT ticker, toStartOfInterval(ts, INTERVAL 30 SECOND) AS bucket, uniqExact(detection_method) AS sev FROM nse.anomalies WHERE $__timeFilter(ts) GROUP BY ticker, bucket) SELECT a.ts AS ts, a.ticker AS ticker, a.detection_method AS method, round(a.score, 2) AS score, e.sev AS severity, a.context AS context FROM nse.anomalies a LEFT JOIN ens e ON a.ticker = e.ticker AND toStartOfInterval(a.ts, INTERVAL 30 SECOND) = e.bucket WHERE $__timeFilter(a.ts) ORDER BY a.ts DESC LIMIT 100" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Anomaly rate by method",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 17 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 60, "stacking": { "mode": "normal" } }, "unit": "short" },
+        "overrides": []
+      },
+      "targets": [
+        { "refId": "A", "editorType": "sql", "format": 1,
+          "rawSql": "SELECT toStartOfMinute(ts) AS time, detection_method, count() AS fired FROM nse.anomalies WHERE $__timeFilter(ts) GROUP BY time, detection_method ORDER BY time" }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

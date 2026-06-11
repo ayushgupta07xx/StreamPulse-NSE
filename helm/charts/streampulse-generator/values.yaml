@@ -1,0 +1,16 @@
+# Build locally and load into kind:  kind load docker-image streampulse/generator:dev
+image:
+  repository: streampulse/generator
+  tag: dev
+  pullPolicy: Never
+
+speed: "10"
+tickers: ALL
+anomalies: 12
+seed: 42
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { cpu: 500m, memory: 512Mi }
+
+kafkaBootstrap: streampulse-redpanda:9092

@@ -1,0 +1,25 @@
+# PyFlink job sources + reference data, shipped as ConfigMaps so every JM/TM
+# pod sees /opt/streampulse/flink/jobs and /opt/streampulse/data exactly like
+# Docker Compose does with bind mounts. ConfigMaps are flat, so the common/
+# package is a second ConfigMap mounted at jobs/common.
+# files/jobs/ and files/data/ are synced by `make sync-helm-files`.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-flink-jobs-src
+data:
+{{ (.Files.Glob "files/jobs/*.py").AsConfig | indent 2 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-flink-jobs-common
+data:
+{{ (.Files.Glob "files/common/*.py").AsConfig | indent 2 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-flink-refdata
+data:
+{{ (.Files.Glob "files/data/*.csv").AsConfig | indent 2 }}

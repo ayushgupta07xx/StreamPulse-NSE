@@ -1,0 +1,23 @@
+image:
+  repository: clickhouse/clickhouse-server
+  tag: "24.8"
+
+resources:
+  requests:
+    cpu: 300m
+    memory: 768Mi
+  limits:
+    cpu: "1"
+    memory: 1536Mi
+
+storage:
+  size: 10Gi
+  storageClassName: standard
+
+service:
+  httpPort: 8123
+  nativePort: 9000
+  metricsPort: 9363
+
+# Kafka broker the Kafka-engine tables consume from (templated into init SQL)
+kafkaBroker: streampulse-redpanda:9092
