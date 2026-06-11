@@ -1,0 +1,29 @@
+groups:
+  - name: streampulse-pipeline
+    rules:
+      - alert: RedpandaDown
+        expr: up{job="redpanda"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redpanda broker is down"
+
+      - alert: FlinkJobManagerDown
+        expr: up{job="flink-jobmanager"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Flink JobManager is down"
+
+      - alert: ClickHouseDown
+        expr: up{job="clickhouse"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ClickHouse is down"
+
+      # Full rule set (lag, checkpoint failures, latency p99, generator stall)
+      # lands on Day 6 with real metric names verified against live scrape data.

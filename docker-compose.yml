@@ -1,0 +1,234 @@
+name: streampulse
+
+services:
+  # ──────────────────────────── Message bus ────────────────────────────
+  redpanda:
+    image: redpandadata/redpanda:v24.2.18
+    container_name: streampulse-redpanda
+    command:
+      - redpanda
+      - start
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:29092
+      - --pandaproxy-addr=internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr=internal://redpanda:8082,external://localhost:28082
+      - --schema-registry-addr=internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr=redpanda:33145
+      - --advertise-rpc-addr=redpanda:33145
+      - --mode=dev-container
+      - --smp=1
+      - --memory=1G
+    # Host ports use a dedicated 2xxxx block — 19092/18081/18082/8088/9001/3000
+    # are occupied by other local project stacks (see ADR-006).
+    ports:
+      - "29092:19092"   # Kafka API (external)
+      - "28081:18081"   # Schema Registry (external)
+      - "28082:18082"   # HTTP proxy (external)
+      - "9644:9644"     # Admin API / Prometheus metrics
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:\\s+true'"]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 20s
+
+  redpanda-console:
+    image: redpandadata/console:v2.7.2
+    container_name: streampulse-console
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_SCHEMAREGISTRY_ENABLED: "true"
+      KAFKA_SCHEMAREGISTRY_URLS: http://redpanda:8081
+    ports:
+      - "8085:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  # ──────────────────────────── Stream processing ────────────────────────────
+  flink-jobmanager:
+    build:
+      context: docker/flink
+    image: streampulse/flink:1.18-py
+    container_name: streampulse-flink-jm
+    command: jobmanager
+    ports:
+      - "28088:8081"    # Flink Web UI
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        jobmanager.memory.process.size: 1024m
+        state.backend.type: rocksdb
+        state.backend.incremental: true
+        state.checkpoints.dir: file:///opt/flink/checkpoints
+        execution.checkpointing.interval: 10s
+        execution.checkpointing.mode: EXACTLY_ONCE
+        execution.checkpointing.timeout: 2min
+        metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+        metrics.reporter.prom.port: 9249
+    volumes:
+      - flink-checkpoints:/opt/flink/checkpoints
+      - ./apps/flink:/opt/streampulse/flink
+      - ./data:/opt/streampulse/data:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8081/overview"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  flink-taskmanager:
+    build:
+      context: docker/flink
+    image: streampulse/flink:1.18-py
+    pull_policy: never
+    command: taskmanager
+    deploy:
+      replicas: 2
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        taskmanager.memory.process.size: 1536m
+        state.backend.type: rocksdb
+        state.backend.incremental: true
+        state.checkpoints.dir: file:///opt/flink/checkpoints
+        metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+        metrics.reporter.prom.port: 9249
+    volumes:
+      - flink-checkpoints:/opt/flink/checkpoints
+      - ./apps/flink:/opt/streampulse/flink
+      - ./data:/opt/streampulse/data:ro
+    depends_on:
+      flink-jobmanager:
+        condition: service_healthy
+
+  # ──────────────────────────── Apps ────────────────────────────
+  generator:
+    build:
+      context: .
+      dockerfile: docker/generator/Dockerfile
+    image: streampulse/generator:dev
+    container_name: streampulse-generator
+    profiles: [pipeline]
+    environment:
+      KAFKA_BOOTSTRAP: redpanda:9092
+      SPEED: ${GENERATOR_SPEED:-10}
+      TICKERS: ${GENERATOR_TICKERS:-ALL}
+    ports:
+      - "8000:8000"   # /metrics
+    volumes:
+      - ./data:/data
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  # ──────────────────────────── OLAP storage ────────────────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: streampulse-clickhouse
+    ports:
+      - "8123:8123"     # HTTP
+      - "29000:9000"    # Native
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - ./clickhouse/config/prometheus.xml:/etc/clickhouse-server/config.d/prometheus.xml:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  # ──────────────────────────── Observability ────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.53.2
+    container_name: streampulse-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: streampulse-alertmanager
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        sed "s|__DISCORD_WEBHOOK_URL__|$${DISCORD_WEBHOOK_URL}|g" /etc/alertmanager/alertmanager.tmpl.yml > /tmp/alertmanager.yml
+        exec /bin/alertmanager --config.file=/tmp/alertmanager.yml --storage.path=/alertmanager
+    environment:
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./observability/alertmanager/alertmanager.tmpl.yml:/etc/alertmanager/alertmanager.tmpl.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    container_name: streampulse-grafana
+    ports:
+      - "23000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 250ms
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    depends_on:
+      - prometheus
+      - clickhouse
+
+  # ──────────────────────────── ML tracking ────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.16.2
+    container_name: streampulse-mlflow
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+      --host 0.0.0.0 --port 5000
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+
+volumes:
+  redpanda-data:
+  flink-checkpoints:
+  clickhouse-data:
+  prometheus-data:
+  grafana-data:
+  mlflow-data:

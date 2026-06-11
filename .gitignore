@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+
+# Secrets / local env
+.env
+*.local.yml
+observability/alertmanager/alertmanager.yml
+
+# ML artifacts
+models/
+mlruns/
+mlflow-data/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.auto.tfvars.example
+.terraform.lock.hcl
+
+# Docker volumes / runtime data
+volumes/
+*.log
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store
+
+# Helm
+helm/**/charts/*.tgz
+helm/**/Chart.lock
+
+# CI / misc
+.coverage
+htmlcov/
+node_modules/

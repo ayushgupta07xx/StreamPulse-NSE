@@ -1,0 +1,51 @@
+ticker,name,sector,industry,mcap_bucket
+RELIANCE,Reliance Industries,Energy,Oil & Gas Integrated,Mega
+TCS,Tata Consultancy Services,Information Technology,IT Services,Mega
+HDFCBANK,HDFC Bank,Financials,Private Bank,Mega
+ICICIBANK,ICICI Bank,Financials,Private Bank,Mega
+INFY,Infosys,Information Technology,IT Services,Mega
+BHARTIARTL,Bharti Airtel,Telecom,Telecom Services,Mega
+ITC,ITC,Consumer Staples,Diversified FMCG,Mega
+SBIN,State Bank of India,Financials,Public Bank,Mega
+LT,Larsen & Toubro,Industrials,Construction & Engineering,Mega
+HCLTECH,HCL Technologies,Information Technology,IT Services,Large
+KOTAKBANK,Kotak Mahindra Bank,Financials,Private Bank,Large
+AXISBANK,Axis Bank,Financials,Private Bank,Large
+ASIANPAINT,Asian Paints,Consumer Discretionary,Paints,Large
+MARUTI,Maruti Suzuki India,Consumer Discretionary,Automobiles,Large
+SUNPHARMA,Sun Pharmaceutical Industries,Healthcare,Pharmaceuticals,Large
+TITAN,Titan Company,Consumer Discretionary,Jewellery & Watches,Large
+BAJFINANCE,Bajaj Finance,Financials,NBFC,Large
+ULTRACEMCO,UltraTech Cement,Materials,Cement,Large
+NESTLEIND,Nestle India,Consumer Staples,Packaged Foods,Large
+WIPRO,Wipro,Information Technology,IT Services,Large
+M&M,Mahindra & Mahindra,Consumer Discretionary,Automobiles,Large
+NTPC,NTPC,Utilities,Power Generation,Large
+POWERGRID,Power Grid Corporation of India,Utilities,Power Transmission,Large
+TMPV,Tata Motors Passenger Vehicles,Consumer Discretionary,Automobiles,Large
+TATASTEEL,Tata Steel,Materials,Steel,Large
+ADANIENT,Adani Enterprises,Industrials,Conglomerate,Large
+ADANIPORTS,Adani Ports and SEZ,Industrials,Ports & Logistics,Large
+ONGC,Oil and Natural Gas Corporation,Energy,Oil Exploration,Large
+COALINDIA,Coal India,Energy,Coal Mining,Large
+BAJAJFINSV,Bajaj Finserv,Financials,Financial Services,Large
+GRASIM,Grasim Industries,Materials,Cement & Chemicals,Large
+HINDALCO,Hindalco Industries,Materials,Aluminium,Large
+TECHM,Tech Mahindra,Information Technology,IT Services,Large
+JSWSTEEL,JSW Steel,Materials,Steel,Large
+INDUSINDBK,IndusInd Bank,Financials,Private Bank,Mid
+DRREDDY,Dr Reddys Laboratories,Healthcare,Pharmaceuticals,Large
+CIPLA,Cipla,Healthcare,Pharmaceuticals,Large
+EICHERMOT,Eicher Motors,Consumer Discretionary,Two Wheelers,Large
+HEROMOTOCO,Hero MotoCorp,Consumer Discretionary,Two Wheelers,Mid
+BAJAJ-AUTO,Bajaj Auto,Consumer Discretionary,Two Wheelers,Large
+DIVISLAB,Divis Laboratories,Healthcare,Pharma API,Large
+APOLLOHOSP,Apollo Hospitals Enterprise,Healthcare,Hospitals,Large
+TATACONSUM,Tata Consumer Products,Consumer Staples,Beverages & Foods,Large
+BRITANNIA,Britannia Industries,Consumer Staples,Packaged Foods,Large
+HINDUNILVR,Hindustan Unilever,Consumer Staples,Diversified FMCG,Mega
+SBILIFE,SBI Life Insurance,Financials,Life Insurance,Large
+HDFCLIFE,HDFC Life Insurance,Financials,Life Insurance,Large
+TRENT,Trent,Consumer Discretionary,Retail,Large
+SHRIRAMFIN,Shriram Finance,Financials,NBFC,Large
+BPCL,Bharat Petroleum Corporation,Energy,Oil Refining & Marketing,Mid
