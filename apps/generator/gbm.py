@@ -52,7 +52,9 @@ def synth_price_path(
     n_jumps = rng.poisson(jump_rate_per_day)
     if n_jumps:
         jump_idx = rng.integers(0, n - 1, size=n_jumps)
-        jump_size = rng.normal(0.0, 0.003, size=n_jumps) + np.sign(rng.standard_normal(n_jumps)) * 0.002
+        jump_size = (
+            rng.normal(0.0, 0.003, size=n_jumps) + np.sign(rng.standard_normal(n_jumps)) * 0.002
+        )
         increments[jump_idx] += jump_size
 
     log_path = log_open + np.concatenate(([0.0], np.cumsum(increments)))

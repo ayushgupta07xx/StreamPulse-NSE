@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from collections import defaultdict
 from datetime import datetime
 
@@ -97,11 +96,7 @@ def verify(topic: str, bars: list[dict]) -> bool:
         f"vwap_out_of_range={vwap_bad} interior_bad_tick_count={bad_counts}/{total_interior}"
     )
     return (
-        len(finals) > 0
-        and misaligned == 0
-        and ohlc_bad == 0
-        and vwap_bad == 0
-        and bad_counts == 0
+        len(finals) > 0 and misaligned == 0 and ohlc_bad == 0 and vwap_bad == 0 and bad_counts == 0
     )
 
 

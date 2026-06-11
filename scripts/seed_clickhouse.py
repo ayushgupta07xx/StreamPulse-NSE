@@ -30,8 +30,11 @@ REPO = Path(__file__).resolve().parent.parent
 
 def bars_for_day(ticker: str, row: pd.Series, span_s: int, rng: np.random.Generator) -> list[list]:
     bar = DayBar(
-        open=float(row["open"]), high=float(row["high"]),
-        low=float(row["low"]), close=float(row["close"]), volume=int(row["volume"]),
+        open=float(row["open"]),
+        high=float(row["high"]),
+        low=float(row["low"]),
+        close=float(row["close"]),
+        volume=int(row["volume"]),
     )
     prices = synth_price_path(bar, rng)
     volumes = synth_volume_path(bar, rng)
@@ -44,13 +47,21 @@ def bars_for_day(ticker: str, row: pd.Series, span_s: int, rng: np.random.Genera
         vol = int(seg_v.sum())
         vwap = float((seg_p * seg_v).sum() / vol) if vol else float(seg_p[-1])
         ws = base + timedelta(seconds=start)
-        out.append([
-            ticker, "5m",
-            ws.strftime("%Y-%m-%d %H:%M:%S"),
-            (ws + timedelta(seconds=span_s)).strftime("%Y-%m-%d %H:%M:%S"),
-            float(seg_p[0]), float(seg_p.max()), float(seg_p.min()), float(seg_p[-1]),
-            vol, round(vwap, 4), span_s,
-        ])
+        out.append(
+            [
+                ticker,
+                "5m",
+                ws.strftime("%Y-%m-%d %H:%M:%S"),
+                (ws + timedelta(seconds=span_s)).strftime("%Y-%m-%d %H:%M:%S"),
+                float(seg_p[0]),
+                float(seg_p.max()),
+                float(seg_p.min()),
+                float(seg_p[-1]),
+                vol,
+                round(vwap, 4),
+                span_s,
+            ]
+        )
     return out
 
 
@@ -66,14 +77,28 @@ def main() -> int:
 
     total = 0
     for ticker in meta["ticker"]:
-        df = pd.read_parquet(REPO / "data" / "historical_ohlc" / f"{ticker}.parquet").tail(args.days)
+        df = pd.read_parquet(REPO / "data" / "historical_ohlc" / f"{ticker}.parquet").tail(
+            args.days
+        )
         rows: list[list] = []
         for _, row in df.iterrows():
             rows.extend(bars_for_day(ticker, row, 300, rng))
         client.insert(
-            "nse.bars", rows,
-            column_names=["ticker", "bar_size", "window_start", "window_end",
-                          "open", "high", "low", "close", "volume", "vwap", "tick_count"],
+            "nse.bars",
+            rows,
+            column_names=[
+                "ticker",
+                "bar_size",
+                "window_start",
+                "window_end",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "vwap",
+                "tick_count",
+            ],
         )
         total += len(rows)
     print(f"seeded {total} 5m bars across {len(meta)} tickers x {args.days} days")

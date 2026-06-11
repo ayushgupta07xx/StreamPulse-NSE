@@ -30,9 +30,15 @@ REQUIRED = ("ticker", "timestamp_ist", "price", "volume", "side")
 # Compact sector map (full enrichment lives in the Flink path; Dataflow demo
 # uses the top-of-index subset, mirroring the Lambda variant)
 SECTORS = {
-    "RELIANCE": "Energy", "TCS": "Information Technology", "HDFCBANK": "Financials",
-    "ICICIBANK": "Financials", "INFY": "Information Technology", "BHARTIARTL": "Telecom",
-    "ITC": "Consumer Staples", "SBIN": "Financials", "LT": "Industrials",
+    "RELIANCE": "Energy",
+    "TCS": "Information Technology",
+    "HDFCBANK": "Financials",
+    "ICICIBANK": "Financials",
+    "INFY": "Information Technology",
+    "BHARTIARTL": "Telecom",
+    "ITC": "Consumer Staples",
+    "SBIN": "Financials",
+    "LT": "Industrials",
     "HINDUNILVR": "Consumer Staples",
 }
 

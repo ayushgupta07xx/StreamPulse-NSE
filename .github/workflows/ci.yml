@@ -85,7 +85,7 @@ jobs:
       - name: Build generator image
         run: docker build -f docker/generator/Dockerfile -t streampulse/generator:ci .
       - name: Trivy scan (generator)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: streampulse/generator:ci
           severity: CRITICAL,HIGH

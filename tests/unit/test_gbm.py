@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-
 from generator.gbm import SESSION_SECONDS, DayBar, synth_price_path, synth_sides, synth_volume_path
 
 BAR = DayBar(open=100.0, high=104.0, low=98.0, close=102.0, volume=5_000_000)

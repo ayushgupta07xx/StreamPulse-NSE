@@ -21,7 +21,12 @@ RP = ["docker", "exec", "streampulse-redpanda"]
 JM = ["docker", "exec", "streampulse-flink-jm"]
 
 ALL_JOBS = ["validate_enrich", "window_bars", "session_bars", "anomaly_online"]
-GROUPS = ["flink-validate-enrich", "flink-window-bars", "flink-session-bars", "flink-anomaly-online"]
+GROUPS = [
+    "flink-validate-enrich",
+    "flink-window-bars",
+    "flink-session-bars",
+    "flink-anomaly-online",
+]
 
 
 def sh(cmd: list[str], check: bool = False) -> str:
@@ -72,17 +77,29 @@ def truncate_clickhouse() -> None:
     """Storage tables accumulate across replay sessions (Kafka engines keep
     consuming through topic resets); truncate for a pristine event-time state."""
     for t in CH_TABLES:
-        sh(["docker", "exec", "streampulse-clickhouse", "clickhouse-client",
-            "--query", f"TRUNCATE TABLE IF EXISTS nse.{t}"])
+        sh(
+            [
+                "docker",
+                "exec",
+                "streampulse-clickhouse",
+                "clickhouse-client",
+                "--query",
+                f"TRUNCATE TABLE IF EXISTS nse.{t}",
+            ]
+        )
     print(f"clickhouse truncated: {', '.join(CH_TABLES)}")
 
 
-def submit(job: str, ooo_seconds: int | None, idle_seconds: int | None,
-           parallelism: int | None = None) -> None:
+def submit(
+    job: str, ooo_seconds: int | None, idle_seconds: int | None, parallelism: int | None = None
+) -> None:
     cmd = JM + [
-        "flink", "run",
-        "-py", f"/opt/streampulse/flink/jobs/{job}.py",
-        "--pyFiles", "/opt/streampulse/flink/jobs",
+        "flink",
+        "run",
+        "-py",
+        f"/opt/streampulse/flink/jobs/{job}.py",
+        "--pyFiles",
+        "/opt/streampulse/flink/jobs",
         "-d",
     ]
     if ooo_seconds is not None:
@@ -97,13 +114,21 @@ def submit(job: str, ooo_seconds: int | None, idle_seconds: int | None,
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--ooo-seconds", type=int, default=None, help="watermark bound for replay speed")
     ap.add_argument(
-        "--idle-seconds", type=int, default=None,
+        "--ooo-seconds", type=int, default=None, help="watermark bound for replay speed"
+    )
+    ap.add_argument(
+        "--idle-seconds",
+        type=int,
+        default=None,
         help="idleness detection (0 = disable; use 0 for replay/backfill verification)",
     )
-    ap.add_argument("--jobs", default="validate_enrich,window_bars", help=f"comma list from {ALL_JOBS}")
-    ap.add_argument("--keep-clickhouse", action="store_true", help="skip truncating ClickHouse tables")
+    ap.add_argument(
+        "--jobs", default="validate_enrich,window_bars", help=f"comma list from {ALL_JOBS}"
+    )
+    ap.add_argument(
+        "--keep-clickhouse", action="store_true", help="skip truncating ClickHouse tables"
+    )
     ap.add_argument("--parallelism", type=int, default=None, help="per-job parallelism override")
     args = ap.parse_args()
 

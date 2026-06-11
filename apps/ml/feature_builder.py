@@ -14,10 +14,9 @@ from __future__ import annotations
 
 import os
 
+import clickhouse_connect
 import numpy as np
 import pandas as pd
-
-import clickhouse_connect
 
 FEATURES = [
     "log_return",
@@ -28,8 +27,8 @@ FEATURES = [
     "pressure_proxy",
 ]
 
-_VOL_WINDOW = 6     # bars (30 min) for return volatility
-_Z_WINDOW = 36      # bars (3 h) for volume / tick-count z-scores
+_VOL_WINDOW = 6  # bars (30 min) for return volatility
+_Z_WINDOW = 36  # bars (3 h) for volume / tick-count z-scores
 _EPS = 1e-9
 
 

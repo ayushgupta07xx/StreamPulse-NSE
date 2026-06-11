@@ -20,7 +20,6 @@ from collections import defaultdict, deque
 from pathlib import Path
 
 import joblib
-import numpy as np
 import pandas as pd
 import typer
 from confluent_kafka import Consumer, Producer
@@ -77,7 +76,9 @@ def run(
     bootstrap: str = typer.Option(os.environ.get("KAFKA_BOOTSTRAP", "localhost:29092")),
     max_bars: int = typer.Option(0, help="stop after N bars (0 = forever); used in tests"),
 ) -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
     scorer = RollingScorer()
     try:
         scorer.bootstrap()
@@ -111,17 +112,23 @@ def run(
 
             ch.insert(
                 "nse.anomalies_ml",
-                [[
-                    bar["ticker"],
-                    bar["window_start"].replace("T", " ").split("+")[0],
-                    scorer.version,
-                    score,
-                    int(flag),
-                    json.dumps(vector),
-                ]],
+                [
+                    [
+                        bar["ticker"],
+                        bar["window_start"].replace("T", " ").split("+")[0],
+                        scorer.version,
+                        score,
+                        int(flag),
+                        json.dumps(vector),
+                    ]
+                ],
                 column_names=[
-                    "ticker", "window_start", "model_version",
-                    "anomaly_score", "is_anomaly", "features",
+                    "ticker",
+                    "window_start",
+                    "model_version",
+                    "anomaly_score",
+                    "is_anomaly",
+                    "features",
                 ],
             )
             if flag:

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from collections import defaultdict
 
 from confluent_kafka import Consumer, KafkaError, TopicPartition
@@ -91,7 +90,9 @@ def main() -> int:
         dup_total += dups
         gap_total += gaps
         if dups or gaps:
-            print(f"  {ticker:<12} n={n:<7} uniq={uniq:<7} max+1={expected:<7} DUPS={dups} GAPS={gaps}")
+            print(
+                f"  {ticker:<12} n={n:<7} uniq={uniq:<7} max+1={expected:<7} DUPS={dups} GAPS={gaps}"
+            )
 
     print(f"\ntickers={len(seqs)} | duplicates={dup_total} | gaps={gap_total}")
     if dup_total == 0 and gap_total == 0 and seqs:

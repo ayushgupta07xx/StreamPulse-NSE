@@ -5,7 +5,6 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 import pytest
-
 from generator.anomaly_injector import ANOMALY_TYPES, inject
 
 IST = ZoneInfo("Asia/Kolkata")

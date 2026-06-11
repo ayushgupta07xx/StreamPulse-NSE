@@ -54,16 +54,12 @@ class KinesisSink:
             failed = resp.get("FailedRecordCount", 0)
             ok = len(chunk) - failed
             for r in chunk[:ok]:
-                metrics.MESSAGES_PRODUCED.labels(
-                    ticker=json.loads(r["Data"])["ticker"]
-                ).inc()
+                metrics.MESSAGES_PRODUCED.labels(ticker=json.loads(r["Data"])["ticker"]).inc()
             if failed:
                 metrics.DELIVERY_ERRORS.inc(failed)
                 # retry transient throttles once
                 retry = [
-                    r
-                    for r, res in zip(chunk, resp["Records"])
-                    if "ErrorCode" in res
+                    r for r, res in zip(chunk, resp["Records"], strict=False) if "ErrorCode" in res
                 ]
                 log.warning("kinesis: %d failed records, retrying once", failed)
                 self.client.put_records(StreamName=self.stream, Records=retry)

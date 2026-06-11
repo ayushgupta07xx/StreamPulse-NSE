@@ -40,10 +40,10 @@ sys.path.insert(0, "/opt/streampulse/flink/jobs")
 
 from common.pipeline import (  # noqa: E402
     dumps,
+    idle_from_argv,
     kafka_exactly_once_sink,
     kafka_json_source,
     make_env,
-    idle_from_argv,
     ooo_from_argv,
     record_ts_watermarks,
     ts_to_epoch_ms,
@@ -51,13 +51,13 @@ from common.pipeline import (  # noqa: E402
 
 ROLLING_WINDOW_MS = 5 * 60 * 1000
 WARMUP_TICKS = 60
-EWMA_WARMUP_T = 240        # ticks before EWMA alerts (slow variance must settle)
-Z_EXTREME = 6.0            # fire immediately — unambiguous single-tick spike
-Z_THRESHOLD = 4.0          # §20: start conservative; tuned against ground truth
-Z_PERSISTENCE = 2          # consecutive breaches for moderate z (kills 1-tick noise)
+EWMA_WARMUP_T = 240  # ticks before EWMA alerts (slow variance must settle)
+Z_EXTREME = 6.0  # fire immediately — unambiguous single-tick spike
+Z_THRESHOLD = 4.0  # §20: start conservative; tuned against ground truth
+Z_PERSISTENCE = 2  # consecutive breaches for moderate z (kills 1-tick noise)
 EWMA_LAMBDA = 0.2
 VOL_RATIO_THRESHOLD = 6.0  # fast/slow variance ratio ≈ vol×2.5 — volatility bursts
-COOLDOWN_MS = 120_000      # per (ticker, method); suppresses alert storms
+COOLDOWN_MS = 120_000  # per (ticker, method); suppresses alert storms
 _EPS = 1e-9
 
 
@@ -68,9 +68,7 @@ class OnlineDetectors(KeyedProcessFunction):
         self.window_state = ctx.get_state(
             ValueStateDescriptor("rolling_window", Types.PICKLED_BYTE_ARRAY())
         )
-        self.ewma_state = ctx.get_state(
-            ValueStateDescriptor("ewma", Types.PICKLED_BYTE_ARRAY())
-        )
+        self.ewma_state = ctx.get_state(ValueStateDescriptor("ewma", Types.PICKLED_BYTE_ARRAY()))
         self.cooldown_state = ctx.get_state(
             ValueStateDescriptor("cooldowns", Types.PICKLED_BYTE_ARRAY())
         )
@@ -141,8 +139,13 @@ class OnlineDetectors(KeyedProcessFunction):
         #    persistence would miss it); 4 ≤ |z| < 6 needs 2 consecutive ticks
         z = (price - mean) / std
         est = self.ewma_state.value() or {
-            "ewma_r": 0.0, "var_slow": None, "var_fast": None, "t": 0,
-            "recent": deque(maxlen=8), "z_run": 0, "last_price": price,
+            "ewma_r": 0.0,
+            "var_slow": None,
+            "var_fast": None,
+            "t": 0,
+            "recent": deque(maxlen=8),
+            "z_run": 0,
+            "last_price": price,
         }
         if abs(z) > Z_THRESHOLD:
             est["z_run"] += 1
@@ -151,9 +154,16 @@ class OnlineDetectors(KeyedProcessFunction):
         z_fire = abs(z) >= Z_EXTREME or est["z_run"] >= Z_PERSISTENCE
         if z_fire and self._cooldown_ok("zscore", ts_ms):
             yield self._event(
-                tick, "zscore", abs(z),
-                {"z": round(z, 3), "mean": round(mean, 2), "std": round(std, 4),
-                 "window_n": n, "run": est["z_run"]},
+                tick,
+                "zscore",
+                abs(z),
+                {
+                    "z": round(z, 3),
+                    "mean": round(mean, 2),
+                    "std": round(std, 4),
+                    "window_n": n,
+                    "run": est["z_run"],
+                },
             )
 
         # ── EWMA SPC on log-RETURNS (stationary; price levels trend and
@@ -165,8 +175,10 @@ class OnlineDetectors(KeyedProcessFunction):
         est["last_price"] = price
         est["t"] += 1
         est["ewma_r"] = EWMA_LAMBDA * r + (1 - EWMA_LAMBDA) * est["ewma_r"]
-        est["var_fast"] = r * r if est["var_fast"] is None else (
-            EWMA_LAMBDA * r * r + (1 - EWMA_LAMBDA) * est["var_fast"]
+        est["var_fast"] = (
+            r * r
+            if est["var_fast"] is None
+            else (EWMA_LAMBDA * r * r + (1 - EWMA_LAMBDA) * est["var_fast"])
         )
         # slow baseline freezes while dispersion is elevated, so a burst can't
         # contaminate its own reference
@@ -193,9 +205,15 @@ class OnlineDetectors(KeyedProcessFunction):
         if rule and self._cooldown_ok("ewma_spc", ts_ms):
             score = abs(dev) if rule != "DISPERSION_vol_ratio" else ratio
             yield self._event(
-                tick, "ewma_spc", score,
-                {"rule": rule, "ewma_return": round(est["ewma_r"], 6),
-                 "dev_sigma": round(dev, 3), "vol_ratio": round(ratio, 2)},
+                tick,
+                "ewma_spc",
+                score,
+                {
+                    "rule": rule,
+                    "ewma_return": round(est["ewma_r"], 6),
+                    "dev_sigma": round(dev, 3),
+                    "vol_ratio": round(ratio, 2),
+                },
             )
 
     @staticmethod
@@ -220,7 +238,9 @@ class OnlineDetectors(KeyedProcessFunction):
 def build(env: StreamExecutionEnvironment) -> None:
     source = kafka_json_source("nse.ticks.clean", group_id="flink-anomaly-online")
     (
-        env.from_source(source, record_ts_watermarks(ooo_from_argv(), idle_from_argv()), "ticks-clean-anomaly")
+        env.from_source(
+            source, record_ts_watermarks(ooo_from_argv(), idle_from_argv()), "ticks-clean-anomaly"
+        )
         .map(json.loads)
         .key_by(lambda t: t["ticker"], key_type=T.STRING())
         .process(OnlineDetectors(), output_type=T.STRING())

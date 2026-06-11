@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import joblib
@@ -52,7 +52,9 @@ def retrain(
     bars = load_bars(days, bar_size)
     feats = build_features(bars)
     if len(feats) < 500:
-        raise typer.Exit(code=typer.echo(f"not enough feature rows ({len(feats)}) — need >=500") or 2)
+        raise typer.Exit(
+            code=typer.echo(f"not enough feature rows ({len(feats)}) — need >=500") or 2
+        )
 
     # hold out the latest session date for validation
     feats["date"] = feats["window_start"].dt.date
@@ -77,7 +79,7 @@ def retrain(
         ]
     )
 
-    with mlflow.start_run(run_name=f"iforest-{datetime.now(timezone.utc):%Y%m%d-%H%M}") as run:
+    with mlflow.start_run(run_name=f"iforest-{datetime.now(UTC):%Y%m%d-%H%M}") as run:
         model.fit(train[FEATURES])
         val_scores = model.decision_function(val[FEATURES])
         val_flags = (model.predict(val[FEATURES]) == -1).mean()
@@ -112,7 +114,7 @@ def retrain(
                 {
                     "version": version,
                     "mlflow_run_id": run.info.run_id,
-                    "trained_at": datetime.now(timezone.utc).isoformat(),
+                    "trained_at": datetime.now(UTC).isoformat(),
                     "n_train": len(train),
                     "features": FEATURES,
                 }

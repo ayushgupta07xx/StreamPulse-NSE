@@ -82,7 +82,9 @@ def inject(
         ticker=ticker,
         anomaly_type=a_type,  # type: ignore[arg-type]
         start_ts=timestamps[start],
-        end_ts=timestamps[end] if a_type != "LEVEL_SHIFT" else timestamps[start] + timedelta(seconds=120),
+        end_ts=timestamps[end]
+        if a_type != "LEVEL_SHIFT"
+        else timestamps[start] + timedelta(seconds=120),
         magnitude=magnitude,
         description=desc,
     )

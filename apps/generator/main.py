@@ -44,7 +44,11 @@ def _root() -> None:
 
 def _load_day(ticker: str, trading_date: str) -> tuple[DayBar, str]:
     df = pd.read_parquet(DATA_DIR / "historical_ohlc" / f"{ticker}.parquet")
-    row = df.iloc[-1] if trading_date == "latest" else df[df["date"].astype(str) == trading_date].iloc[0]
+    row = (
+        df.iloc[-1]
+        if trading_date == "latest"
+        else df[df["date"].astype(str) == trading_date].iloc[0]
+    )
     bar = DayBar(
         open=float(row["open"]),
         high=float(row["high"]),
@@ -77,11 +81,17 @@ def run(
     metrics_port: int = typer.Option(8000),
     duration_s: int = typer.Option(0, help="stop after N wall-clock seconds (0 = full session)"),
 ) -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
     metrics.serve(metrics_port)
 
     meta = pd.read_csv(DATA_DIR / "nifty50_metadata.csv")
-    universe = list(meta["ticker"]) if tickers.upper() == "ALL" else [t.strip() for t in tickers.split(",")]
+    universe = (
+        list(meta["ticker"])
+        if tickers.upper() == "ALL"
+        else [t.strip() for t in tickers.split(",")]
+    )
 
     rng = np.random.default_rng(seed)
     session_id = f"sess-{uuid.uuid4().hex[:12]}"
@@ -118,7 +128,13 @@ def run(
         )
         records.append(rec)
         metrics.ANOMALIES_INJECTED.labels(anomaly_type=rec.anomaly_type).inc()
-        log.info("injected %s on %s at %s (%s)", rec.anomaly_type, ticker, rec.start_ts.time(), rec.description)
+        log.info(
+            "injected %s on %s at %s (%s)",
+            rec.anomaly_type,
+            ticker,
+            rec.start_ts.time(),
+            rec.description,
+        )
 
     truth = GroundTruth(
         session_id=session_id,
@@ -181,7 +197,12 @@ def run(
     finally:
         sink.flush()
         elapsed = time.monotonic() - wall_start
-        log.info("emitted %d ticks in %.1fs (%.0f ticks/s)", emitted, elapsed, emitted / max(elapsed, 1e-9))
+        log.info(
+            "emitted %d ticks in %.1fs (%.0f ticks/s)",
+            emitted,
+            elapsed,
+            emitted / max(elapsed, 1e-9),
+        )
 
 
 if __name__ == "__main__":

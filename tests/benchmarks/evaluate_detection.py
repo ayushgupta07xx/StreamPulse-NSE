@@ -26,7 +26,7 @@ import json
 import statistics
 import sys
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, "apps")
@@ -45,10 +45,7 @@ def load_detections() -> list[dict]:
         "SELECT ticker, toUnixTimestamp64Milli(ts), detection_method, score "
         "FROM nse.anomalies ORDER BY ts"
     ).result_rows
-    return [
-        {"ticker": r[0], "ts_ms": int(r[1]), "method": r[2], "score": r[3]}
-        for r in rows
-    ]
+    return [{"ticker": r[0], "ts_ms": int(r[1]), "method": r[2], "score": r[3]} for r in rows]
 
 
 def evaluate(truth: dict, detections: list[dict], grace_s: int) -> dict[str, dict]:
@@ -128,7 +125,9 @@ def main() -> int:
         print("|---|---|---|---|---|---|")
         for m, r in results.items():
             lat = f"{r['median_latency_s']}s" if r["median_latency_s"] is not None else "—"
-            print(f"| {m} | {r['detections']} | {r['precision'] if r['precision'] is not None else '—'} | {r['recall']} | {r['f1'] if r['f1'] is not None else '—'} | {lat} |")
+            print(
+                f"| {m} | {r['detections']} | {r['precision'] if r['precision'] is not None else '—'} | {r['recall']} | {r['f1'] if r['f1'] is not None else '—'} | {lat} |"
+            )
     else:
         for m, r in results.items():
             print(f"{m:>18}: {r}")

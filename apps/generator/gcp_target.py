@@ -24,9 +24,7 @@ class PubSubSink:
 
         project = os.environ["GCP_PROJECT"]
         self._publisher = pubsub_v1.PublisherClient(
-            batch_settings=pubsub_v1.types.BatchSettings(
-                max_messages=500, max_latency=0.05
-            )
+            batch_settings=pubsub_v1.types.BatchSettings(max_messages=500, max_latency=0.05)
         )
         self._topic_path = self._publisher.topic_path(project, topic)
         self._pending = []

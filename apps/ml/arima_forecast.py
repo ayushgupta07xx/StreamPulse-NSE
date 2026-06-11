@@ -73,7 +73,9 @@ def run(
     threshold: float = typer.Option(RESIDUAL_THRESHOLD),
     max_bars: int = typer.Option(0, help="stop after N bars (0 = forever); used in tests"),
 ) -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
     models: dict[str, TickerArima] = defaultdict(TickerArima)
 
     consumer = Consumer(
