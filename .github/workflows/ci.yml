@@ -103,6 +103,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: azure/setup-helm@v5
+      - name: Free runner disk space
+        # the custom images exist in up to 4 copies on one runner (docker
+        # store, import tarball, 2× node containerd); preinstalled bloat tips
+        # the 72 GiB filesystem past kubelet's disk-pressure threshold →
+        # node taints + ErrImageNeverPull (observed at 96% usage)
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune -af || true
+          df -h /
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
       - name: Create cluster
@@ -120,6 +130,10 @@ jobs:
           docker build -f docker/flink/Dockerfile -t streampulse/flink:1.18-py docker/flink
           docker build -f docker/generator/Dockerfile -t streampulse/generator:dev .
           k3d image import streampulse/flink:1.18-py streampulse/generator:dev -c streampulse-ci
+          # nodes have the images now — drop the runner-local copies (disk)
+          docker rmi streampulse/flink:1.18-py streampulse/generator:dev || true
+          docker builder prune -af || true
+          df -h /
       - name: Sync chart files + install
         run: |
           python3 scripts/ci_sync_helm.py
