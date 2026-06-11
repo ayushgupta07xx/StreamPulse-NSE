@@ -15,3 +15,7 @@ RUN pip3 install --no-cache-dir apache-flink==1.18.1
 # Prometheus metrics reporter already ships pre-activated in /opt/flink/plugins/.
 RUN curl -fsSL -o /opt/flink/lib/flink-sql-connector-kafka-3.0.2-1.18.jar \
     https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kafka/3.0.2-1.18/flink-sql-connector-kafka-3.0.2-1.18.jar
+
+# Checkpoint dir pre-created with flink ownership so the named volume that
+# mounts here inherits writable permissions (fresh volumes copy image perms).
+RUN mkdir -p /opt/flink/checkpoints && chown flink:flink /opt/flink/checkpoints

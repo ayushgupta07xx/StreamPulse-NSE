@@ -20,7 +20,7 @@
 
 - [x] **Day 1** — repo scaffold, docker-compose stack healthy (9 containers, Flink 2 TM / 8 slots), rpk smoke test passed
 - [x] **Day 2** — 50/50 tickers cached (TATAMOTORS→TMPV, LTIM→TRENT — old symbols dead on Yahoo). Generator verified: 495 t/s @10×, **110,424 t/s @max** (criterion ≥1k). 7 topics created per §13. Ground truth JSON written. (typer pinned ^0.16 — 0.12 broke on click 8.3)
-- [ ] Day 3 — Flink validate/enrich, exactly-once + fault-injection test
+- [x] **Day 3** — validate/enrich job live (enrichment verified in nse.ticks.clean). Fault test: SIGKILL on task-hosting TM mid-stream (sess-02fcc37ed123, seed 99) → auto-recovery → verifier: 74,400/74,400 ticks, **0 dups / 0 gaps** over 1.36M total messages. PyFlink fixes: no Rich* classes, output_type=Types.STRING() mandatory before Java sinks, checkpoint volume needs flink-uid ownership (Dockerfile handles it)
 - [ ] Day 4 — Flink 1m/5m/15m OHLCV bars + late side-output
 - [ ] Day 5 — ClickHouse schema, Kafka engines, MVs, TTLs
 - [ ] Day 6 — Prometheus scrape all, 3 Grafana dashboards, Alertmanager→Discord

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($r = Invoke-RestMethod \"http://localhost:28088/jobs/506a7e8edf6a3fcffcc36c828f608e7b/exceptions\"; Write-Output \"exception entries: $\\($r.exceptionHistory.entries.Count\\)\"; $r.exceptionHistory.entries | ForEach-Object { \"{0}  {1}\" -f \\(Get-Date -Date \\([DateTimeOffset]::FromUnixTimeMilliseconds\\($_.timestamp\\).LocalDateTime\\) -Format \"HH:mm:ss\"\\), $_.exceptionName })",
+      "PowerShell(Set-Location \"D:\\\\StreamPulse NSE\"; $env:PYTHONPATH=\"apps\"; .\\\\.venv\\\\Scripts\\\\python.exe -m generator.main run --speed 10 --duration-s 150 --anomalies 5 --seed 99)",
+      "PowerShell($gt = Get-Content \"D:\\\\StreamPulse NSE\\\\data\\\\anomaly_ground_truth.json\" | ConvertFrom-Json; Write-Output \"session: $\\($gt.session_id\\) seed: $\\($gt.seed\\)\"; docker exec streampulse-redpanda rpk group describe flink-validate-enrich 2>$null | Select-String \"nse.ticks.raw\" | Select-Object -First 3)",
+      "PowerShell(docker exec streampulse-redpanda rpk group describe flink-validate-enrich)"
+    ]
+  }
+}

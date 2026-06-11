@@ -4,7 +4,7 @@
 
 - Validation: parseable JSON, required fields, price > 0, volume ≥ 0, plausible
   timestamp, known ticker. Rejects are counted (Flink metrics) and dropped.
-- Enrichment: static Nifty 50 metadata joined in a RichMapFunction loaded at
+- Enrichment: static Nifty 50 metadata joined in a MapFunction loaded at
   open() — deliberately NOT broadcast state (see ADR-007: the CSV is immutable
   reference data; a broadcast stream would add complexity with zero benefit in
   PyFlink).
@@ -22,8 +22,11 @@ import json
 import sys
 from datetime import datetime
 
+from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.datastream.functions import RichMapFunction, RuntimeContext
+
+# PyFlink has no Rich* variants — FlatMapFunction itself exposes open()/close()
+from pyflink.datastream.functions import FlatMapFunction, RuntimeContext
 
 sys.path.insert(0, "/opt/streampulse/flink/jobs")
 
@@ -41,8 +44,8 @@ _MIN_TS = datetime(2020, 1, 1).timestamp() * 1000
 _MAX_TS = datetime(2035, 1, 1).timestamp() * 1000
 
 
-class ValidateEnrich(RichMapFunction):
-    """str(JSON tick) → str(enriched JSON) | None for rejects."""
+class ValidateEnrich(FlatMapFunction):
+    """str(JSON tick) → str(enriched JSON); rejects emit nothing."""
 
     def open(self, runtime_context: RuntimeContext) -> None:
         self.metadata = load_metadata()
@@ -50,16 +53,16 @@ class ValidateEnrich(RichMapFunction):
         self.rejected = group.counter("ticks_rejected")
         self.accepted = group.counter("ticks_accepted")
 
-    def map(self, raw: str):
+    def flat_map(self, raw: str):
         try:
             tick = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
             self.rejected.inc()
-            return None
+            return
 
         if any(f not in tick for f in REQUIRED_FIELDS):
             self.rejected.inc()
-            return None
+            return
 
         meta = self.metadata.get(tick["ticker"])
         try:
@@ -70,18 +73,18 @@ class ValidateEnrich(RichMapFunction):
             side_ok = tick["side"] in ("BUY", "SELL")
         except (ValueError, TypeError):
             self.rejected.inc()
-            return None
+            return
 
         if not (meta and price_ok and volume_ok and ts_ok and side_ok):
             self.rejected.inc()
-            return None
+            return
 
         tick["name"] = meta["name"]
         tick["sector"] = meta["sector"]
         tick["industry"] = meta["industry"]
         tick["mcap_bucket"] = meta["mcap_bucket"]
         self.accepted.inc()
-        return dumps(tick)
+        yield dumps(tick)
 
 
 def build(env: StreamExecutionEnvironment) -> None:
@@ -92,8 +95,9 @@ def build(env: StreamExecutionEnvironment) -> None:
 
     (
         env.from_source(source, WatermarkStrategy.no_watermarks(), "ticks-raw")
-        .map(ValidateEnrich())
-        .filter(lambda x: x is not None)
+        # output_type is load-bearing: the Java Kafka sink needs Java Strings,
+        # not pickled Python bytes (ADR-007)
+        .flat_map(ValidateEnrich(), output_type=Types.STRING())
         .sink_to(sink)
         .name("ticks-clean-sink")
     )
