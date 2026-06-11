@@ -44,7 +44,7 @@ metadata:
   name: {{ .Release.Name }}-ml-models
 spec:
   accessModes: ["ReadWriteOnce"]
-  storageClassName: standard
+  # no storageClassName: use the cluster default (kind: standard, k3s: local-path)
   resources:
     requests:
       storage: 1Gi

@@ -18,7 +18,7 @@ memory: 1G
 
 storage:
   size: 5Gi
-  storageClassName: standard   # kind default provisioner
+  storageClassName: ""   # empty = cluster default (kind: standard, k3s: local-path)
 
 service:
   kafkaPort: 9092

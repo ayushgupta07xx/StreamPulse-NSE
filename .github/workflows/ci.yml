@@ -30,6 +30,9 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           recursive: true
+          # info-level findings (DL3059: consecutive RUNs) conflict with
+          # deliberate layer separation for build caching — fail on warning+
+          failure-threshold: warning
 
   helm-lint:
     runs-on: ubuntu-latest

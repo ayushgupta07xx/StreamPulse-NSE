@@ -12,7 +12,7 @@ resources:
 
 storage:
   size: 10Gi
-  storageClassName: standard
+  storageClassName: ""   # empty = cluster default (kind: standard, k3s: local-path)
 
 service:
   httpPort: 8123
