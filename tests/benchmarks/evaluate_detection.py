@@ -37,12 +37,16 @@ METHODS = ["zscore", "ewma_spc", "isolation_forest", "arima_residual"]
 
 
 def load_detections() -> list[dict]:
+    # epoch millis end-to-end: clickhouse-connect returns DateTime64 columns as
+    # naive UTC while the ground truth carries +05:30 ISO strings — comparing
+    # wall-clock datetimes silently shifts detections by 5.5 h (zero matches)
     client = clickhouse_client()
     rows = client.query(
-        "SELECT ticker, ts, detection_method, score FROM nse.anomalies ORDER BY ts"
+        "SELECT ticker, toUnixTimestamp64Milli(ts), detection_method, score "
+        "FROM nse.anomalies ORDER BY ts"
     ).result_rows
     return [
-        {"ticker": r[0], "ts": r[1], "method": r[2], "score": r[3]}
+        {"ticker": r[0], "ts_ms": int(r[1]), "method": r[2], "score": r[3]}
         for r in rows
     ]
 
@@ -50,8 +54,11 @@ def load_detections() -> list[dict]:
 def evaluate(truth: dict, detections: list[dict], grace_s: int) -> dict[str, dict]:
     anomalies = truth["anomalies"]
     for a in anomalies:
-        a["_start"] = datetime.fromisoformat(a["start_ts"]).replace(tzinfo=None) - timedelta(seconds=5)
-        a["_end"] = datetime.fromisoformat(a["end_ts"]).replace(tzinfo=None) + timedelta(seconds=grace_s)
+        start_ms = int(datetime.fromisoformat(a["start_ts"]).timestamp() * 1000)
+        end_ms = int(datetime.fromisoformat(a["end_ts"]).timestamp() * 1000)
+        a["_start_ms"] = start_ms - 5_000
+        a["_end_ms"] = end_ms + grace_s * 1_000
+        a["_true_start_ms"] = start_ms
 
     results: dict[str, dict] = {}
     matched_by_anomaly: dict[str, set] = defaultdict(set)  # anomaly_id -> methods
@@ -63,10 +70,10 @@ def evaluate(truth: dict, detections: list[dict], grace_s: int) -> dict[str, dic
         hit_anomalies: set[str] = set()
 
         for d in dets:
-            ts = d["ts"].replace(tzinfo=None) if hasattr(d["ts"], "replace") else d["ts"]
+            ts_ms = d["ts_ms"]
             hit = None
             for a in anomalies:
-                if d["ticker"] == a["ticker"] and a["_start"] <= ts <= a["_end"]:
+                if d["ticker"] == a["ticker"] and a["_start_ms"] <= ts_ms <= a["_end_ms"]:
                     hit = a
                     break
             if hit:
@@ -74,8 +81,7 @@ def evaluate(truth: dict, detections: list[dict], grace_s: int) -> dict[str, dic
                 if hit["anomaly_id"] not in hit_anomalies:
                     hit_anomalies.add(hit["anomaly_id"])
                     matched_by_anomaly[hit["anomaly_id"]].add(method)
-                    true_start = datetime.fromisoformat(hit["start_ts"]).replace(tzinfo=None)
-                    tp_latencies.append((ts - true_start).total_seconds())
+                    tp_latencies.append((ts_ms - hit["_true_start_ms"]) / 1000.0)
 
         n_det = len(dets)
         fp = n_det - matched_det

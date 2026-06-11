@@ -51,10 +51,13 @@ from common.pipeline import (  # noqa: E402
 
 ROLLING_WINDOW_MS = 5 * 60 * 1000
 WARMUP_TICKS = 60
-Z_THRESHOLD = 3.0
+EWMA_WARMUP_T = 240        # ticks before EWMA alerts (slow variance must settle)
+Z_EXTREME = 6.0            # fire immediately — unambiguous single-tick spike
+Z_THRESHOLD = 4.0          # §20: start conservative; tuned against ground truth
+Z_PERSISTENCE = 2          # consecutive breaches for moderate z (kills 1-tick noise)
 EWMA_LAMBDA = 0.2
-EWMA_L = 3.0
-COOLDOWN_MS = 30_000
+VOL_RATIO_THRESHOLD = 6.0  # fast/slow variance ratio ≈ vol×2.5 — volatility bursts
+COOLDOWN_MS = 120_000      # per (ticker, method); suppresses alert storms
 _EPS = 1e-9
 
 
@@ -74,9 +77,20 @@ class OnlineDetectors(KeyedProcessFunction):
 
     # ── helpers ──────────────────────────────────────────────────────────
     def _rolling(self, ts_ms: int, price: float) -> tuple[int, float, float]:
-        """Push (ts, price); evict >5 min old; return (n, mean, std)."""
+        """Push (ts, price); evict >5 min old; return (n, mean, std).
+
+        Replay guard: if event time jumps BACKWARDS by more than the window
+        (a new replay session over checkpoint-restored state), the deque holds
+        "future" ticks that left-eviction can never remove — poisoned stats
+        forever. Detect the jump and start fresh for this key.
+        """
         st = self.window_state.value() or {"dq": deque(), "s": 0.0, "s2": 0.0}
         dq: deque = st["dq"]
+        if dq and ts_ms < dq[-1][0] - ROLLING_WINDOW_MS:
+            st = {"dq": deque(), "s": 0.0, "s2": 0.0}
+            dq = st["dq"]
+            self.ewma_state.clear()
+            self.cooldown_state.clear()
         dq.append((ts_ms, price))
         st["s"] += price
         st["s2"] += price * price
@@ -122,36 +136,75 @@ class OnlineDetectors(KeyedProcessFunction):
         if n < WARMUP_TICKS or std < _EPS:
             return
 
-        # ── Z-score ──
+        # ── Z-score (price level vs rolling window): two-tier ──
+        #    |z| ≥ 6 fires instantly (a 2-tick spike is unambiguous at 6σ and
+        #    persistence would miss it); 4 ≤ |z| < 6 needs 2 consecutive ticks
         z = (price - mean) / std
-        if abs(z) > Z_THRESHOLD and self._cooldown_ok("zscore", ts_ms):
+        est = self.ewma_state.value() or {
+            "ewma_r": 0.0, "var_slow": None, "var_fast": None, "t": 0,
+            "recent": deque(maxlen=8), "z_run": 0, "last_price": price,
+        }
+        if abs(z) > Z_THRESHOLD:
+            est["z_run"] += 1
+        else:
+            est["z_run"] = 0
+        z_fire = abs(z) >= Z_EXTREME or est["z_run"] >= Z_PERSISTENCE
+        if z_fire and self._cooldown_ok("zscore", ts_ms):
             yield self._event(
                 tick, "zscore", abs(z),
-                {"z": round(z, 3), "mean": round(mean, 2), "std": round(std, 4), "window_n": n},
+                {"z": round(z, 3), "mean": round(mean, 2), "std": round(std, 4),
+                 "window_n": n, "run": est["z_run"]},
             )
 
-        # ── EWMA SPC ──
-        est = self.ewma_state.value() or {"ewma": price, "t": 0, "recent": deque(maxlen=8)}
+        # ── EWMA SPC on log-RETURNS (stationary; price levels trend and
+        #    poison control limits — measured: 5,650 false alarms/session).
+        #    Two charts: mean chart (WE1/WE2 — level shifts, big moves) and a
+        #    dispersion chart (fast/slow variance ratio — volatility bursts,
+        #    which are symmetric and invisible to the mean chart) ──
+        r = math.log(price / max(est["last_price"], _EPS))
+        est["last_price"] = price
         est["t"] += 1
-        est["ewma"] = EWMA_LAMBDA * price + (1 - EWMA_LAMBDA) * est["ewma"]
-        t = est["t"]
-        sigma_ewma = std * math.sqrt(
-            (EWMA_LAMBDA / (2 - EWMA_LAMBDA)) * (1 - (1 - EWMA_LAMBDA) ** (2 * t))
+        est["ewma_r"] = EWMA_LAMBDA * r + (1 - EWMA_LAMBDA) * est["ewma_r"]
+        est["var_fast"] = r * r if est["var_fast"] is None else (
+            EWMA_LAMBDA * r * r + (1 - EWMA_LAMBDA) * est["var_fast"]
         )
-        dev = (est["ewma"] - mean) / max(sigma_ewma, _EPS)  # in σ_ewma units
+        # slow baseline freezes while dispersion is elevated, so a burst can't
+        # contaminate its own reference
+        ratio = (est["var_fast"] / est["var_slow"]) if est["var_slow"] else 1.0
+        if est["var_slow"] is None:
+            est["var_slow"] = r * r
+        elif ratio < VOL_RATIO_THRESHOLD / 2:
+            est["var_slow"] = 0.98 * est["var_slow"] + 0.02 * r * r
+
+        sigma_r = math.sqrt(max(est["var_slow"], _EPS * _EPS))
+        sigma_ewma = sigma_r * math.sqrt(
+            (EWMA_LAMBDA / (2 - EWMA_LAMBDA)) * (1 - (1 - EWMA_LAMBDA) ** (2 * est["t"]))
+        )
+        dev = est["ewma_r"] / max(sigma_ewma, _EPS)  # center line = 0 for returns
         est["recent"].append(dev)
         self.ewma_state.update(est)
 
+        if est["t"] < EWMA_WARMUP_T:
+            return
+
         rule = self._western_electric(est["recent"])
+        if rule is None and ratio > VOL_RATIO_THRESHOLD:
+            rule = "DISPERSION_vol_ratio"
         if rule and self._cooldown_ok("ewma_spc", ts_ms):
+            score = abs(dev) if rule != "DISPERSION_vol_ratio" else ratio
             yield self._event(
-                tick, "ewma_spc", abs(dev),
-                {"rule": rule, "ewma": round(est["ewma"], 2), "dev_sigma": round(dev, 3),
-                 "mean": round(mean, 2)},
+                tick, "ewma_spc", score,
+                {"rule": rule, "ewma_return": round(est["ewma_r"], 6),
+                 "dev_sigma": round(dev, 3), "vol_ratio": round(ratio, 2)},
             )
 
     @staticmethod
     def _western_electric(recent: deque) -> str | None:
+        """Alert on WE rules 1+2 only. Rules 3 (4-of-5 beyond 1σ) and 4 (8 one
+        side) are drift heuristics for human-reviewed control charts; on an
+        EWMA of returns they saturate on ordinary momentum — measured: the
+        detector fired at every cooldown expiry (2,480/session). Documented in
+        docs/detection-benchmarks.md."""
         r = list(recent)
         if not r:
             return None
@@ -161,12 +214,6 @@ class OnlineDetectors(KeyedProcessFunction):
             last3 = r[-3:]
             if sum(1 for d in last3 if d > 2) >= 2 or sum(1 for d in last3 if d < -2) >= 2:
                 return "WE2_2of3_beyond_2sigma"
-        if len(r) >= 5:
-            last5 = r[-5:]
-            if sum(1 for d in last5 if d > 1) >= 4 or sum(1 for d in last5 if d < -1) >= 4:
-                return "WE3_4of5_beyond_1sigma"
-        if len(r) >= 8 and (all(d > 0 for d in r[-8:]) or all(d < 0 for d in r[-8:])):
-            return "WE4_8_one_side"
         return None
 
 

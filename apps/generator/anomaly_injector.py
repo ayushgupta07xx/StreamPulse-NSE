@@ -34,11 +34,18 @@ def inject(
     rng: np.random.Generator,
     anomaly_type: str | None = None,
     counter: int = 0,
+    max_idx: int | None = None,
 ) -> AnomalyRecord:
-    """Mutate ``prices``/``volumes`` in place with one anomaly; return its record."""
+    """Mutate ``prices``/``volumes`` in place with one anomaly; return its record.
+
+    ``max_idx`` caps injection to the session span that will actually be
+    streamed (duration-limited runs) so ground truth never contains anomalies
+    the pipeline never saw — that silently deflates measured recall.
+    """
     n = len(prices)
+    ceiling = min(n, max_idx) if max_idx else n
     a_type = anomaly_type or rng.choice(ANOMALY_TYPES)
-    start = int(rng.integers(_EDGE_BUFFER, n - _EDGE_BUFFER))
+    start = int(rng.integers(_EDGE_BUFFER, max(ceiling - _EDGE_BUFFER, _EDGE_BUFFER + 1)))
 
     if a_type == "PRICE_SPIKE":
         duration = int(rng.integers(2, 8))

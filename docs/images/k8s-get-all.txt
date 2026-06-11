@@ -1,0 +1,48 @@
+﻿NAME                                                 READY   STATUS    RESTARTS        AGE
+pod/streampulse-clickhouse-0                         1/1     Running   0               15m
+pod/streampulse-flink-jobmanager-675b66bb5-nz6j9     1/1     Running   0               46m
+pod/streampulse-flink-taskmanager-848c55bf8b-gn2lx   1/1     Running   0               37m
+pod/streampulse-flink-taskmanager-848c55bf8b-wdkqq   1/1     Running   0               36m
+pod/streampulse-generator-8658bcc7d-j2mdp            1/1     Running   5 (5m14s ago)   46m
+pod/streampulse-grafana-5f6ccb6bb-scsd8              1/1     Running   0               46m
+pod/streampulse-prometheus-6c6f769f97-xw2s7          1/1     Running   0               46m
+pod/streampulse-redpanda-0                           1/1     Running   0               46m
+
+NAME                                    TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)                               AGE
+service/kubernetes                      ClusterIP   10.96.0.1      <none>        443/TCP                               53m
+service/streampulse-clickhouse          ClusterIP   10.96.82.155   <none>        8123/TCP,9000/TCP,9363/TCP            46m
+service/streampulse-flink-jobmanager    ClusterIP   10.96.5.51     <none>        6123/TCP,6124/TCP,8081/TCP,9249/TCP   46m
+service/streampulse-generator           ClusterIP   10.96.65.153   <none>        8000/TCP                              46m
+service/streampulse-grafana             ClusterIP   10.96.123.27   <none>        3000/TCP                              46m
+service/streampulse-prometheus          ClusterIP   10.96.8.157    <none>        9090/TCP                              46m
+service/streampulse-redpanda            ClusterIP   10.96.12.1     <none>        9092/TCP,9644/TCP,8081/TCP,8082/TCP   46m
+service/streampulse-redpanda-headless   ClusterIP   None           <none>        33145/TCP                             46m
+
+NAME                                            READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/streampulse-flink-jobmanager    1/1     1            1           46m
+deployment.apps/streampulse-flink-taskmanager   2/2     2            2           46m
+deployment.apps/streampulse-generator           1/1     1            1           46m
+deployment.apps/streampulse-grafana             1/1     1            1           46m
+deployment.apps/streampulse-prometheus          1/1     1            1           46m
+
+NAME                                                       DESIRED   CURRENT   READY   AGE
+replicaset.apps/streampulse-flink-jobmanager-675b66bb5     1         1         1       46m
+replicaset.apps/streampulse-flink-taskmanager-74c4799bb9   0         0         0       46m
+replicaset.apps/streampulse-flink-taskmanager-756fff58f6   0         0         0       37m
+replicaset.apps/streampulse-flink-taskmanager-848c55bf8b   2         2         2       37m
+replicaset.apps/streampulse-generator-8658bcc7d            1         1         1       46m
+replicaset.apps/streampulse-grafana-5f6ccb6bb              1         1         1       46m
+replicaset.apps/streampulse-prometheus-6c6f769f97          1         1         1       46m
+
+NAME                                      READY   AGE
+statefulset.apps/streampulse-clickhouse   1/1     46m
+statefulset.apps/streampulse-redpanda     1/1     46m
+
+NAME                                                                REFERENCE                                  TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/streampulse-flink-taskmanager   Deployment/streampulse-flink-taskmanager   cpu: <unknown>/75%   2         8         2          46m
+
+NAME                                   SCHEDULE     TIMEZONE   SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+cronjob.batch/streampulse-ml-retrain   30 1 * * *   <none>     False     0        <none>          26m
+   ┌─'k8s pipeline evidence'─┬───────────────now()─┐
+1. │ k8s pipeline evidence   │ 2026-06-11 10:45:56 │
+   └─────────────────────────┴─────────────────────┘

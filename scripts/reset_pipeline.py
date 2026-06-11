@@ -34,18 +34,21 @@ def sh(cmd: list[str], check: bool = False) -> str:
 def cancel_all_jobs() -> None:
     jobs = requests.get(f"{FLINK}/jobs/overview", timeout=10).json()["jobs"]
     for j in jobs:
-        if j["state"] in ("RUNNING", "RESTARTING", "CREATED"):
+        if j["state"] in ("RUNNING", "RESTARTING", "CREATED", "FAILING"):
             print(f"cancelling {j['name']} ({j['jid']})")
             requests.patch(f"{FLINK}/jobs/{j['jid']}?mode=cancel", timeout=10)
-    for _ in range(30):
+    for _ in range(45):
         live = [
             j
             for j in requests.get(f"{FLINK}/jobs/overview", timeout=10).json()["jobs"]
-            if j["state"] in ("RUNNING", "RESTARTING", "CANCELLING")
+            if j["state"] not in ("CANCELED", "FAILED", "FINISHED")
         ]
         if not live:
             return
         time.sleep(2)
+    # a job that survives cancellation would keep stale state/consumer-group
+    # offsets alive and silently corrupt the next session's results
+    raise RuntimeError(f"jobs survived cancellation: {[(j['name'], j['state']) for j in live]}")
 
 
 def wipe_topics_and_groups() -> None:

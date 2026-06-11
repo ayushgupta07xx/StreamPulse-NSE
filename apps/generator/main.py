@@ -98,6 +98,12 @@ def run(
     log.info("synthesized %d tickers × %d ticks for %s", len(paths), SESSION_SECONDS, resolved_date)
 
     # ── Inject anomalies & record ground truth ────────────────────────────
+    # Duration-limited runs stream only the first duration_s × speed session
+    # seconds — cap injections to that span so ground truth stays honest
+    if duration_s and speed != "max":
+        injection_ceiling = min(SESSION_SECONDS, int(duration_s * float(speed)))
+    else:
+        injection_ceiling = SESSION_SECONDS
     records = []
     for i in range(anomalies):
         ticker = universe[int(rng.integers(0, len(universe)))]
@@ -108,6 +114,7 @@ def run(
             timestamps,
             rng,
             counter=i,
+            max_idx=injection_ceiling,
         )
         records.append(rec)
         metrics.ANOMALIES_INJECTED.labels(anomaly_type=rec.anomaly_type).inc()
