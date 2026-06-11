@@ -12,6 +12,12 @@ metadata:
 spec:
   backoffLimit: 10
   template:
+    metadata:
+      labels:
+        # instance label is load-bearing: NetworkPolicies admit intra-release
+        # traffic by this selector (clickhouse ingress must accept this pod)
+        app.kubernetes.io/name: clickhouse-init
+        app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       restartPolicy: OnFailure
       containers:

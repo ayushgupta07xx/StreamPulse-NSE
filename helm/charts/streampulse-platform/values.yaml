@@ -11,3 +11,9 @@ clickhouse:
 streampulse-generator:
   kafkaBootstrap: streampulse-redpanda:9092
   speed: "10"
+
+networkPolicy:
+  # zero-trust ingress (default-deny + intra-release + UI ports). Enforced on
+  # k3s/k3d (CI); kind's default CNI ignores NetworkPolicy — install a
+  # policy-capable CNI to enforce locally.
+  enabled: true

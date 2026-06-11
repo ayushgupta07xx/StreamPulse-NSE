@@ -14,6 +14,12 @@ spec:
     spec:
       backoffLimit: 2
       template:
+        metadata:
+          labels:
+            # instance label is load-bearing: clickhouse ingress admits
+            # intra-release pods only once NetworkPolicies are on
+            app.kubernetes.io/name: ml-retrain
+            app.kubernetes.io/instance: {{ .Release.Name }}
         spec:
           restartPolicy: OnFailure
           containers:

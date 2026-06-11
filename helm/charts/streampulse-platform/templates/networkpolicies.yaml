@@ -1,0 +1,55 @@
+{{- if .Values.networkPolicy.enabled }}
+# Day 13 hardening: zero-trust ingress for the whole release.
+#
+# Model: default-deny ingress on every release pod, then admit (1) traffic
+# between pods of this release — the pipeline is fully intra-release: generator
+# → redpanda ← flink ⇄ flink, clickhouse → redpanda, prometheus → everything,
+# grafana → clickhouse/prometheus, init/submit/retrain jobs → their targets —
+# and (2) the UI ports from anywhere, so port-forward / NodePort demos work on
+# CNIs that route those through the policy path.
+#
+# Every pod template in the umbrella carries app.kubernetes.io/instance —
+# the job/cron pods were labeled specifically so this selector admits them.
+# k3s enforces NetworkPolicy out of the box (kube-router controller), so CI's
+# k3d smoke actually exercises these; kind's default kindnet does not enforce,
+# making this a no-op locally unless a policy-capable CNI is installed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-default-deny-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-intra-release
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-ui
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - { protocol: TCP, port: 3000 }   # grafana
+        - { protocol: TCP, port: 8081 }   # flink UI / REST
+        - { protocol: TCP, port: 9090 }   # prometheus
+{{- end }}

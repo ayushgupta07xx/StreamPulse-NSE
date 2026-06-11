@@ -8,6 +8,12 @@ metadata:
 spec:
   backoffLimit: 8
   template:
+    metadata:
+      labels:
+        # instance label is load-bearing: flink JM REST ingress admits
+        # intra-release pods only once NetworkPolicies are on
+        app.kubernetes.io/name: flink-submit
+        app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       restartPolicy: OnFailure
       containers:
