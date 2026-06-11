@@ -27,18 +27,24 @@ spec:
             - { name: native, containerPort: {{ .Values.service.nativePort }} }
             - { name: metrics, containerPort: {{ .Values.service.metricsPort }} }
           resources: {{- toYaml .Values.resources | nindent 12 }}
+          # startupProbe owns the cold-start window (up to 150 s on a busy
+          # node); liveness only patrols after startup succeeds
+          startupProbe:
+            httpGet: { path: /ping, port: http }
+            periodSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             httpGet: { path: /ping, port: http }
-            initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet: { path: /ping, port: http }
-            initialDelaySeconds: 30
-            periodSeconds: 15
+            periodSeconds: 20
+            failureThreshold: 6
           volumeMounts:
             - { name: data, mountPath: /var/lib/clickhouse }
-            - { name: config, mountPath: /etc/clickhouse-server/config.d }
-            # subPath: add ONE file without shadowing the image's users.d
+            # subPath mounts: add single files WITHOUT shadowing the image's
+            # config.d/users.d (which carry listen_host + default-user setup)
+            - { name: config, mountPath: /etc/clickhouse-server/config.d/prometheus.xml, subPath: prometheus.xml }
             - { name: users, mountPath: /etc/clickhouse-server/users.d/streampulse.xml, subPath: streampulse.xml }
       volumes:
         - name: config

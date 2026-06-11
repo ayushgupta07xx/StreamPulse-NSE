@@ -4,6 +4,8 @@ image:
   pullPolicy: Never
 
 jobmanager: streampulse-flink-jobmanager:8081
+# graph-build happens in THIS pod: sources/sinks bake the bootstrap in
+kafkaBootstrap: streampulse-redpanda:9092
 
 jobs:
   - validate_enrich

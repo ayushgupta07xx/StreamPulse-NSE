@@ -22,13 +22,15 @@ spec:
             - -c
             - |
               set -e
-              until clickhouse-client --host {{ .Release.Name }}-clickhouse --query 'SELECT 1' >/dev/null 2>&1; do
+              # network clients must use the provisioned user — CH 24.x keeps
+              # `default` server-local (see users.d/streampulse.xml)
+              CH="clickhouse-client --host {{ .Release.Name }}-clickhouse --user streampulse --password streampulse"
+              until $CH --query 'SELECT 1' >/dev/null 2>&1; do
                 echo waiting for clickhouse; sleep 3
               done
               for f in /sql/schema.sql /sql/materialized_views.sql /sql/ttl_policies.sql; do
                 echo applying $f
-                sed 's/redpanda:9092/{{ .Values.kafkaBroker }}/g' $f | \
-                  clickhouse-client --host {{ .Release.Name }}-clickhouse --multiquery
+                sed 's/redpanda:9092/{{ .Values.kafkaBroker }}/g' $f | $CH --multiquery
               done
               echo init complete
           volumeMounts:

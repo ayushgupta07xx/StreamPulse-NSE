@@ -14,6 +14,8 @@ spec:
         - name: submit
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - { name: KAFKA_BOOTSTRAP, value: {{ .Values.kafkaBootstrap | quote }} }
           command:
             - /bin/bash
             - -c
@@ -22,6 +24,13 @@ spec:
               until curl -sf http://{{ .Values.jobmanager }}/overview; do
                 echo waiting for jobmanager; sleep 5
               done
+              # cancel any live jobs first (idempotent re-submits on upgrade)
+              LIVE='import json,sys; [print(j["jid"]) for j in json.load(sys.stdin).get("jobs",[]) if j["state"] in ("RUNNING","RESTARTING","CREATED")]'
+              for jid in $(curl -s http://{{ .Values.jobmanager }}/jobs/overview | python3 -c "$LIVE"); do
+                echo "cancelling stale job $jid"
+                curl -s -X PATCH "http://{{ .Values.jobmanager }}/jobs/$jid?mode=cancel" || true
+              done
+              sleep 5
               {{- range .Values.jobs }}
               echo "submitting {{ . }}"
               flink run -m {{ $.Values.jobmanager }} -d \

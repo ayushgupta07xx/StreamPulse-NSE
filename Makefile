@@ -38,12 +38,14 @@ reset:
 verify-bars:
 	.venv/Scripts/python.exe scripts/verify_bars.py
 
-# Placeholders — implemented on later build days
+# 5-minute live demo: wall-clock ticks + a visible spike on TCS.
+# Open Grafana (localhost:23000) -> Market Overview + Anomaly Feed first.
 demo:
-	@echo "make demo lands on Day 14 (scripts/inject_demo_anomalies.py)"
+	.venv/Scripts/python.exe scripts/inject_demo_anomalies.py --ticker TCS --minutes 5
 
+# Detection accuracy benchmark against injected ground truth
 benchmark:
-	@echo "make benchmark lands on Day 10 (tests/benchmarks)"
+	.venv/Scripts/python.exe tests/benchmarks/evaluate_detection.py --markdown
 
 # Copy SQL / job sources / dashboards / reference data into chart files/ dirs
 # (charts must be self-contained for helm package + .Files access)

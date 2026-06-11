@@ -63,6 +63,10 @@ def _session_timestamps(trading_date: str) -> list[datetime]:
 @app.command()
 def run(
     speed: str = typer.Option(os.environ.get("SPEED", "10"), help="1 | 10 | 100 | max"),
+    target: str = typer.Option(
+        os.environ.get("SINK_TARGET", "kafka"),
+        help="kafka | kinesis (Day 11, LocalStack) | pubsub (Day 12, GCP)",
+    ),
     bootstrap: str = typer.Option(os.environ.get("KAFKA_BOOTSTRAP", "localhost:29092")),
     topic: str = typer.Option("nse.ticks.raw"),
     tickers: str = typer.Option(os.environ.get("TICKERS", "ALL"), help="ALL or comma-separated"),
@@ -121,8 +125,17 @@ def run(
     log.info("ground truth (%d anomalies) → %s", len(records), ground_truth_out)
 
     # ── Stream ────────────────────────────────────────────────────────────
-    ensure_topics(bootstrap)
-    sink = TickSink(bootstrap, topic)
+    if target == "kinesis":
+        from generator.aws_target import KinesisSink
+
+        sink = KinesisSink()
+    elif target == "pubsub":
+        from generator.gcp_target import PubSubSink
+
+        sink = PubSubSink()
+    else:
+        ensure_topics(bootstrap)
+        sink = TickSink(bootstrap, topic)
     sides = {t: synth_sides(paths[t]["prices"], rng) for t in universe}
     seqs = dict.fromkeys(universe, 0)
 
