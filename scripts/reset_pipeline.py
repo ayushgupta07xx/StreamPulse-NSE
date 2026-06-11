@@ -62,6 +62,18 @@ def recreate_topics() -> None:
     print("topics recreated")
 
 
+CH_TABLES = ["ticks_clean", "bars", "bars_late", "anomalies", "anomalies_ml", "bars_1m_ch"]
+
+
+def truncate_clickhouse() -> None:
+    """Storage tables accumulate across replay sessions (Kafka engines keep
+    consuming through topic resets); truncate for a pristine event-time state."""
+    for t in CH_TABLES:
+        sh(["docker", "exec", "streampulse-clickhouse", "clickhouse-client",
+            "--query", f"TRUNCATE TABLE IF EXISTS nse.{t}"])
+    print(f"clickhouse truncated: {', '.join(CH_TABLES)}")
+
+
 def submit(job: str, ooo_seconds: int | None, idle_seconds: int | None) -> None:
     cmd = JM + [
         "flink", "run",
@@ -85,11 +97,14 @@ def main() -> int:
         help="idleness detection (0 = disable; use 0 for replay/backfill verification)",
     )
     ap.add_argument("--jobs", default="validate_enrich,window_bars", help=f"comma list from {ALL_JOBS}")
+    ap.add_argument("--keep-clickhouse", action="store_true", help="skip truncating ClickHouse tables")
     args = ap.parse_args()
 
     cancel_all_jobs()
     wipe_topics_and_groups()
     recreate_topics()
+    if not args.keep_clickhouse:
+        truncate_clickhouse()
     for job in [j.strip() for j in args.jobs.split(",") if j.strip()]:
         submit(job, args.ooo_seconds, args.idle_seconds)
     print("pipeline reset complete")
