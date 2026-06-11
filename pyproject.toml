@@ -68,4 +68,11 @@ addopts = "-q"
 
 [tool.sqlfluff.core]
 dialect = "clickhouse"
-exclude_rules = "L016"
+# Style rules incompatible with ClickHouse DDL: aligned/grouped column layout
+# (LT01/LT02/LT05/LT09), OHLC columns legitimately named open/close (RF04,
+# CP02), camelCase builtins and mixed-case types — parseDateTime64BestEffort,
+# DateTime64 (CP03/CP05), engine-ordered SELECTs in MVs (ST06). The schema's
+# real validation is application to ClickHouse in compose smoke + k8s init.
+# ignore parsing: sqlfluff's clickhouse dialect cannot parse TTL expressions.
+exclude_rules = "LT01,LT02,LT05,LT09,RF04,CP02,CP03,CP05,ST06"
+ignore = "parsing"

@@ -132,6 +132,19 @@ jobs:
         run: |
           sleep 90
           kubectl exec streampulse-redpanda-0 -- rpk topic consume nse.ticks.raw --num 3 -o start -f '%v\n'
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo "===== nodes ====="; kubectl get nodes -o wide || true
+          echo "===== pods ====="; kubectl get pods -A -o wide || true
+          echo "===== events ====="; kubectl get events -A --sort-by=.lastTimestamp | tail -60 || true
+          echo "===== clickhouse describe ====="; kubectl describe pods -l app.kubernetes.io/name=clickhouse || true
+          for p in $(kubectl get pods -o name); do
+            echo "===== logs $p ====="
+            kubectl logs "$p" --tail=30 --all-containers --prefix || true
+          done
+          echo "===== disk ====="; df -h || true
+          echo "===== memory ====="; free -m || true
       - name: Teardown
         if: always()
         run: k3d cluster delete streampulse-ci
