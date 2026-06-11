@@ -18,6 +18,7 @@ import time
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -148,6 +149,7 @@ def run(
     log.info("ground truth (%d anomalies) → %s", len(records), ground_truth_out)
 
     # ── Stream ────────────────────────────────────────────────────────────
+    sink: Any  # TickSink | KinesisSink | PubSubSink — duck-typed send/flush
     if target == "kinesis":
         from generator.aws_target import KinesisSink
 

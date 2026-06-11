@@ -16,6 +16,7 @@ import logging
 import os
 import warnings
 from collections import defaultdict
+from typing import Any
 
 import numpy as np
 import typer
@@ -44,7 +45,7 @@ class TickerArima:
 
     def __init__(self) -> None:
         self.buffer: list[float] = []
-        self.result = None
+        self.result: Any = None
         self.resid_std: float = 0.0
 
     def update(self, close: float) -> float | None:
@@ -52,9 +53,11 @@ class TickerArima:
         if self.result is None:
             self.buffer.append(close)
             if len(self.buffer) >= WARMUP_BARS:
-                model = ARIMA(np.asarray(self.buffer), order=ORDER)
-                self.result = model.fit(method_kwargs={"warn_convergence": False})
-                self.resid_std = float(np.std(self.result.resid[5:])) or 1e-9
+                fitted = ARIMA(np.asarray(self.buffer), order=ORDER).fit(
+                    method_kwargs={"warn_convergence": False}
+                )
+                self.resid_std = float(np.std(fitted.resid[5:])) or 1e-9
+                self.result = fitted
             return None
 
         forecast = float(self.result.forecast(1)[0])
@@ -95,7 +98,10 @@ def run(
             msg = consumer.poll(1.0)
             if msg is None or msg.error():
                 continue
-            bar = json.loads(msg.value())
+            raw = msg.value()
+            if raw is None:
+                continue
+            bar = json.loads(raw)
             z = models[bar["ticker"]].update(float(bar["close"]))
             seen += 1
             if z is not None and abs(z) > threshold:

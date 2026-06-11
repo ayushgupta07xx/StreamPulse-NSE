@@ -103,7 +103,15 @@ jobs:
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
       - name: Create cluster
-        run: k3d cluster create streampulse-ci --agents 1 --wait
+        # ghcr.io pulls are occasionally flaky on hosted runners — retry
+        run: |
+          for i in 1 2 3; do
+            k3d cluster create streampulse-ci --agents 1 --wait && exit 0
+            echo "cluster create attempt $i failed; cleaning up and retrying"
+            k3d cluster delete streampulse-ci || true
+            sleep 15
+          done
+          exit 1
       - name: Build + import images
         run: |
           docker build -f docker/flink/Dockerfile -t streampulse/flink:1.18-py docker/flink

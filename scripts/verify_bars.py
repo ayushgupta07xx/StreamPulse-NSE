@@ -43,14 +43,18 @@ def consume_all(bootstrap: str, topic: str) -> list[dict]:
                 if tp.partition not in done and c.position([tp])[0].offset >= ends[tp.partition]:
                     done.add(tp.partition)
             continue
-        if msg.error():
-            if msg.error().code() == KafkaError._PARTITION_EOF:
-                done.add(msg.partition())
+        err = msg.error()
+        part, off, val = msg.partition(), msg.offset(), msg.value()
+        assert part is not None  # delivered messages always carry these
+        if err is not None:
+            if err.code() == KafkaError._PARTITION_EOF:
+                done.add(part)
                 continue
-            raise RuntimeError(msg.error())
-        out.append(json.loads(msg.value()))
-        if msg.offset() + 1 >= ends[msg.partition()]:
-            done.add(msg.partition())
+            raise RuntimeError(err)
+        assert off is not None and val is not None
+        out.append(json.loads(val))
+        if off + 1 >= ends[part]:
+            done.add(part)
     c.close()
     return out
 

@@ -103,7 +103,10 @@ def run(
             msg = consumer.poll(1.0)
             if msg is None or msg.error():
                 continue
-            bar = json.loads(msg.value())
+            raw = msg.value()
+            if raw is None:
+                continue
+            bar = json.loads(raw)
             result = scorer.score(bar)
             seen += 1
             if result is None:

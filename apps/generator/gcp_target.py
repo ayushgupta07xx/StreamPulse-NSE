@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
 from generator import metrics
 from generator.schemas import Tick
@@ -27,7 +28,7 @@ class PubSubSink:
             batch_settings=pubsub_v1.types.BatchSettings(max_messages=500, max_latency=0.05)
         )
         self._topic_path = self._publisher.topic_path(project, topic)
-        self._pending = []
+        self._pending: list[Any] = []
 
     def send(self, tick: Tick) -> None:
         future = self._publisher.publish(

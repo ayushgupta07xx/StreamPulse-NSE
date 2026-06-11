@@ -52,9 +52,8 @@ def retrain(
     bars = load_bars(days, bar_size)
     feats = build_features(bars)
     if len(feats) < 500:
-        raise typer.Exit(
-            code=typer.echo(f"not enough feature rows ({len(feats)}) — need >=500") or 2
-        )
+        typer.echo(f"not enough feature rows ({len(feats)}) — need >=500")
+        raise typer.Exit(code=2)
 
     # hold out the latest session date for validation
     feats["date"] = feats["window_start"].dt.date
