@@ -47,3 +47,6 @@ helm/**/Chart.lock
 .coverage
 htmlcov/
 node_modules/
+
+# Claude Code local config
+.claude/
