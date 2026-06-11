@@ -50,3 +50,6 @@ node_modules/
 
 # local tooling config
 .claude/
+
+# terraform archive_file build artifact
+infra/terraform/modules/aws/lambda/*.zip
