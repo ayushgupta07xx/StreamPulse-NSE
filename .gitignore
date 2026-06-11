@@ -48,5 +48,5 @@ helm/**/Chart.lock
 htmlcov/
 node_modules/
 
-# Claude Code local config
+# local tooling config
 .claude/
